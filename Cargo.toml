@@ -1,0 +1,16 @@
+[package]
+authors = ["Garrett Berg <googberg@gmail.com>"]
+name = "novault"
+version = "0.1.0"
+
+[dependencies]
+base64 = "0.6.0"
+ctrlc = "3.0.2"
+dialoguer = "0.1.0"
+openssl = "0.9.17"
+prelude = "0.2.0"
+serde = "1.0.14"
+serde_derive = "1.0.14"
+structopt = "0.1.0"
+structopt-derive = "0.1.0"
+toml = "0.4.5"
