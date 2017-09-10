@@ -7,14 +7,16 @@ extern crate ansi_term;
 extern crate base64;
 extern crate chan_signal;
 extern crate dialoguer;
+extern crate enigo;
 #[macro_use]
 extern crate error_chain;
-extern crate libc;
+extern crate file_lock;
 extern crate prelude;
 extern crate structopt;
 #[macro_use]
 extern crate structopt_derive;
 extern crate serde;
+extern crate shellexpand;
 #[macro_use]
 extern crate serde_derive;
 extern crate strfmt;
@@ -22,6 +24,9 @@ extern crate openssl;
 extern crate toml;
 
 use structopt::StructOpt;
+use file_lock::{Lock, AccessMode, LockKind};
+use std::os::unix::io::AsRawFd;
+use std::env::home_dir;
 
 mod types;
 mod cmds;
@@ -36,6 +41,10 @@ struct Opt {
 	#[structopt(short = "c", long = "config", default_value = "~/.config/novault.toml")]
 	/// Specify an alternate config file to use
     config: String,
+
+	#[structopt(short = "l", long = "lock", default_value = "~/.local/novault.lock")]
+	/// Specify an alternate lock file to use
+    lock: String,
 
 	#[structopt(subcommand)]
 	cmd: Command,
@@ -77,7 +86,7 @@ Overwrite even if the site name already exists
 ")]
         overwrite: bool,
 
-        #[structopt(long = "fmt", default_value = "{p}", help = "\
+        #[structopt(long = "fmt", default_value = "{p:.20}", help = "\
 Format to use for the string. This can be used to reduce
 the length of the string and also to add any special
 characters that might be needed. Must have at least one
@@ -130,9 +139,28 @@ This is good for displaying username, etc")]
 
 fn main() {
     let opt = Opt::from_args();
-    let path = PathBuf::from(opt.config);
-	// FIXME: do not allow any running instances to exist except when
-	// triggering. Use chan-signal for this.
+    let path = PathBuf::from(shellexpand::tilde(&opt.config).to_string());
+    let lock_path = PathBuf::from(shellexpand::tilde(&opt.lock).to_string());
+
+	if !lock_path.exists() {
+		OpenOptions::new()
+			.create(true)
+			.write(true)
+			.open(&lock_path)
+			.expect(&format!("could not create lock file: {}", lock_path.display()));
+	}
+	let lock_file = OpenOptions::new()
+		.write(true)
+		.open(&lock_path)
+		.expect(&format!("could not open lock file: {}", lock_path.display()));
+
+	let lock = Lock::new(lock_file.as_raw_fd());
+
+	if let Err(_) = lock.lock(LockKind::NonBlocking, AccessMode::Write) {
+        let msg = format!("Could not obtain lock for {}.\nHelp: is there another NoVault running?",
+                  lock_path.display());
+		exit_with_err(&msg);
+	}
 
 	let result = match opt.cmd {
 		Command::Init { level } => {
@@ -156,9 +184,15 @@ fn main() {
 	match result {
 		Ok(_) => exit(0),
 		Err(e) => {
-			let msg = format!("Error\n{}", e);
-			eprintln!("{}", ansi_term::Colour::Red.bold().paint(msg));
-			exit(1);
+			let msg = format!("{}", e);
+			exit_with_err(&msg);
 		}
 	}
+
+	drop(lock);
+}
+
+fn exit_with_err(msg: &str) {
+	eprintln!("Error\n{}", ansi_term::Colour::Red.bold().paint(msg));
+	exit(1);
 }

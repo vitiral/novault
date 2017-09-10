@@ -1,4 +1,4 @@
-use libc;
+use enigo::{self, KeyboardControllable};
 
 use types::*;
 use utils;
@@ -13,9 +13,9 @@ fn validate_name(name: &str) -> Result<()> {
     }
 }
 
-fn validate_password(config: &Config, password: &str) -> Result<()> {
+fn validate_master(config: &Config, master: &str) -> Result<()> {
     let settings = &config.settings;
-    let check = utils::check_hash(settings.level, &password);
+    let check = utils::check_hash(settings.level, &master);
     if check != settings.checkhash {
         bail!(ErrorKind::CheckFailed);
     }
@@ -27,11 +27,11 @@ pub fn init(path: &Path, level: u32) -> Result<()> {
 	if path.exists() {
         bail!(ErrorKind::ConfigFileExists(path.to_path_buf()));
 	}
-    let password = utils::get_password()?;
-    if password.len() < 10 {
+    let master = utils::get_master()?;
+    if master.len() < 10 {
         bail!(ErrorKind::InvalidLength);
     };
-    let check = utils::check_hash(level, &password);
+    let check = utils::check_hash(level, &master);
 	let config = Config {
 		settings: Settings {
             checkhash: check.to_string(),
@@ -55,7 +55,7 @@ pub fn set(path: &Path, name: &str, overwrite: bool, pin: bool, rev: u64, fmt: &
     }
 
     // just make sure it doesn't fail fmt
-    utils::fmt_hash(fmt, 0, name, "fake-password", rev, pin)?;
+    utils::fmt_hash(fmt, 0, name, "fake-master", rev, pin)?;
 
     let site = Site {
         fmt: fmt.to_string(),
@@ -97,21 +97,20 @@ pub fn get(path: &Path, name: &str, stdout: bool) -> Result<()> {
         Some(s) => s,
         None => bail!(ErrorKind::NotFound(name.to_string())),
     };
-    let password = utils::get_password()?;
-    validate_password(&config, &password)?;
+    let master = utils::get_master()?;
+    validate_master(&config, &master)?;
 
-	let hashed = utils::fmt_hash(&site.fmt, settings.level, name, &password, site.rev, site.pin)?;
+	let password = utils::fmt_hash(&site.fmt, settings.level, name, &master, site.rev, site.pin)?;
     if stdout {
-        println!("{}", hashed);
+        println!("{}", password);
         return Ok(());
     }
-    println!("run `kill -USR1 {:?}` to continue", unsafe{libc::getpid()});
+    eprintln!("Continue with: killall -SIGUSR1 -u $USER novault");
     chan_signal::notify(&[Signal::USR1])
         .recv()
         .expect("unwrap ok in single thread");
 
-    println!("received URS1");
-    println!("UNIMPLEMENTED");
-
+    let mut enigo = enigo::Enigo::new();
+    enigo.key_sequence(&password);
     Ok(())
 }

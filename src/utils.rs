@@ -64,7 +64,7 @@ fn test_fmt() {
     assert!(fmt("long-prefix-{p:.2}", "barabado").is_err()); // pwd too short
 }
 
-pub fn get_password() -> Result<String> {
+pub fn get_master() -> Result<String> {
 	dialoguer::PasswordInput::new("Enter your master password")
 		.interact()
         .chain_err(|| "OS Error: getting password failed")
@@ -83,7 +83,7 @@ fn test_fmt_hash() {
 }
 
 pub fn check_hash(level: u32, password: &str) -> String {
-	fmt_hash("{p:.32}", level, CHECK_HASH, password, 0, false).unwrap()
+	fmt_hash("{p:.16}", level, CHECK_HASH, password, 0, false).unwrap()
 }
 
 #[test]
