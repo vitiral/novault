@@ -8,8 +8,7 @@ static INVALID_LEN: &str = "\
     Master password length must be > 10. It is better to make \
     a long password that you can remember than a short one with \
     lots of symbols. \"battery horse loves staple\" has high \
-    entropy but is reasonably easy to remember.\
-    \n\nFIXME: add xkcd article.";
+    entropy but is reasonably easy to remember.";
 
 error_chain!{
     types {

@@ -1,5 +1,8 @@
+use libc;
+
 use types::*;
 use utils;
+use chan_signal::{self, Signal};
 
 /// ensure that a name is valid
 fn validate_name(name: &str) -> Result<()> {
@@ -102,5 +105,13 @@ pub fn get(path: &Path, name: &str, stdout: bool) -> Result<()> {
         println!("{}", hashed);
         return Ok(());
     }
-    unimplemented!();
+    println!("run `kill -USR1 {:?}` to continue", unsafe{libc::getpid()});
+    chan_signal::notify(&[Signal::USR1])
+        .recv()
+        .expect("unwrap ok in single thread");
+
+    println!("received URS1");
+    println!("UNIMPLEMENTED");
+
+    Ok(())
 }

@@ -5,9 +5,11 @@
 
 extern crate ansi_term;
 extern crate base64;
+extern crate chan_signal;
 extern crate dialoguer;
 #[macro_use]
 extern crate error_chain;
+extern crate libc;
 extern crate prelude;
 extern crate structopt;
 #[macro_use]
@@ -27,12 +29,9 @@ mod utils;
 
 use types::*;
 
-// ##################################################
-// # Opt
-
 #[derive(Debug, StructOpt)]
 #[structopt(name = "novault")]
-/// programatic vaultless password management
+/// ultra simple and secure vaultless password management
 struct Opt {
 	#[structopt(short = "c", long = "config", default_value = "~/.config/novault.toml")]
 	/// Specify an alternate config file to use
@@ -42,67 +41,69 @@ struct Opt {
 	cmd: Command,
 }
 
+// FIXME: need to add color and some other stuff
+// FIXME: need to preserve order
 #[derive(Debug, StructOpt)]
 enum Command {
 	#[structopt(name = "init")]
 	/// Initialize the config file
 	Init {
-		#[structopt(long = "level", default_value = "20")]
-		/// The password is re-hashed 2 to the power of level (`2^level`) times.
-		///
-		/// Increasing this number will increase the security of your
-		/// passwords, but also take more time to get a password. The default
-		/// of 20, (about a million times) takes about 1 second to compute on
-		/// my 2 core 800MHz laptop.
-		///
-		/// It is recommended that this number NEVER be increased above about 50,
-		/// unless you are storing your passwords on a GPU super computer.
-		///
-		/// Do NOT change this paramter once initialized, as it will invalidate
-		/// all of your passwords.
+		#[structopt(long = "level", default_value = "20", help = "\
+The password is re-hashed 2 to the power of level (`2^level`) times.
+
+Increasing this number will increase the security of your
+passwords, but also take more time to get a password. The default
+of 20, (about a million times) takes about 1 second to compute on
+my 2 core 800MHz laptop.
+
+It is recommended that this number NEVER be increased above about 50,
+unless you are storing your passwords on a GPU super computer.
+
+Do NOT change this paramter once initialized, as it will invalidate
+all of your passwords."
+		)]
 		level: u32,
 	},
 
 	#[structopt(name = "set")]
 	/// Set a site's metadata
     Set {
-        #[structopt(name = "name")]
-        /// name for the site. Recommended: <username>@<site-url>
+        #[structopt(name = "name", help = "\
+Name for the site. Recommended: <username>@<site-url>")]
         name: String,
 
-        #[structopt(short = "o", long = "overwrite")]
-        /// Overwrite even if the site name already exists
+        #[structopt(short = "o", long = "overwrite", help = "\
+Overwrite even if the site name already exists
+")]
         overwrite: bool,
 
-        #[structopt(long = "fmt", default_value = "{p}")]
-        /// Format to use for the string. This can be used to reduce
-		/// the length of the string and also to add any "special"
-		/// characters that might be needed. Must have at least one
-		/// field with "{p}" in it. For example, to have a password that
-		/// is 10 characters plus "!@" (so 12 characters total) use:
-		///
-		///     --fmt "{p:.10}!@"
-		///
-		/// Note: the first 4 characters of the generated password must
-		/// appear.
+        #[structopt(long = "fmt", default_value = "{p}", help = "\
+Format to use for the string. This can be used to reduce
+the length of the string and also to add any special
+characters that might be needed. Must have at least one
+field with '{p}' in it. For example, to have a password that
+is 10 characters plus '!@' (so 12 characters total) use:
+
+    --fmt '{p:.10}!@'
+
+Note: the first 4 characters of the generated password must
+appear.")]
         fmt: String,
 
-        #[structopt(long = "pin")]
-		/// Make the password suitable for pins by only the digits 0-9.
-		///
-		/// This only replaces the hash, you can still control the length,
-		/// or add any characters you like with --fmt
+        #[structopt(long = "pin", help = "\
+Make the password suitable for pins by only the digits 0-9.
+This only replaces the hash, you can still control the length,
+or add any characters you like with --fmt")]
         pin: bool,
 
-        #[structopt(short = "r", long = "rev", default_value = "0")]
-        /// revision number of password, useful for sites that require passwords to change
+        #[structopt(short = "r", long = "rev", default_value = "0", help = "
+Revision number of password, useful for sites that require passwords to change")]
         rev: u64,
 
-        #[structopt(short = "n", long = "notes", default_value = "")]
-        /// NOT SECURE: do not store any secrets here. The notes are
-		/// displayed every time a site is accessed.
-		///
-		/// This is good for displaying username, etc
+        #[structopt(short = "n", long = "notes", default_value = "", help="\
+NOT SECURE: do not store any secrets here. The notes are
+displayed every time a site is accessed.
+This is good for displaying username, etc")]
         notes: String,
     },
 
@@ -118,16 +119,20 @@ enum Command {
         name: String,
 
         #[structopt(long = "stdout")]
-        /// !!UNSECURE!! print password to stdout
+        /// !! NOT SECURE !! print password to stdout
         stdout: bool,
 	},
+
+	#[structopt(name = "get")]
+	/// Trigger the running NoVault to send its password
+	Trigger {},
 }
 
 fn main() {
     let opt = Opt::from_args();
     let path = PathBuf::from(opt.config);
 	// FIXME: do not allow any running instances to exist except when
-	// triggering.
+	// triggering. Use chan-signal for this.
 
 	let result = match opt.cmd {
 		Command::Init { level } => {
@@ -141,6 +146,10 @@ fn main() {
         }
         Command::Get { name, stdout } => {
             cmds::get(&path, &name, stdout)
+        }
+        Command::Trigger {} => {
+			// FIXME: implement trigger
+            unimplemented!();
         }
 	};
 
