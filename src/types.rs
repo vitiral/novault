@@ -4,11 +4,12 @@ pub use prelude::*;
 
 pub static CHECK_HASH: &str = "__checkhash__";
 
-static INVALID_LEN: &str = "\
-    Master password length must be > 10. It is better to make \
-    a long password that you can remember than a short one with \
-    lots of symbols. \"battery horse loves staple\" has high \
-    entropy but is reasonably easy to remember.";
+static INVALID_LEN: &str = "Master password length must be > 10. It is better to make \
+                            a long password that you can remember than a short one with \
+                            lots of symbols. \"battery horse loves staple\" has high \
+                            entropy but is reasonably easy to remember.";
+pub static SITE_HEADER: &str = "NAME\tNOTES";
+
 
 error_chain!{
     types {
@@ -61,43 +62,56 @@ error_chain!{
     }
 }
 
+/// "global" arguments from the operation
+pub struct OptGlobal {
+    pub config: PathBuf,
+    pub stdin: bool,
+    pub stdout: bool,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
-	pub settings: Settings,
-	pub sites: BTreeMap<String, Site>,
+    pub settings: Settings,
+    pub sites: BTreeMap<String, Site>,
 }
 
 impl Config {
-	pub fn load(path: &Path) -> Result<Config> {
-		let mut f = File::open(path)
-            .chain_err(|| format!("Could not open: {}", path.display()))?;
-		let mut out = String::new();
-		f.read_to_string(&mut out)
+    pub fn load(path: &Path) -> Result<Config> {
+        let mut f = File::open(path).chain_err(|| format!("Could not open: {}", path.display()))?;
+        let mut out = String::new();
+        f.read_to_string(&mut out)
             .chain_err(|| format!("Failed to read: {}", path.display()))?;
-		::toml::from_str(&out)
-            .chain_err(|| format!("Config file format is invalid: {}", path.display()))
-	}
+        ::toml::from_str(&out).chain_err(|| {
+            format!("Config file format is invalid: {}", path.display())
+        })
+    }
 
-	pub fn dump(&self, file: &mut File) -> Result<()> {
-		file.write_all(::toml::to_string_pretty(self).unwrap().as_ref())?;
+    pub fn dump(&self, file: &mut File) -> Result<()> {
+        file.write_all(::toml::to_string_pretty(self).unwrap().as_ref())?;
         Ok(())
-	}
+    }
 }
 
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Settings {
-	/// hash of `CHECK_HASH`
-	pub checkhash: String,
+    /// hash of `CHECK_HASH`
+    pub checkhash: String,
 
-	/// number of times a password is re-hashed
-	pub level: u32,
+    /// number of times a password is re-hashed
+    pub level: u32,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Site {
-	pub fmt: String,
-	pub pin: bool,
-	pub rev: u64,
+    pub fmt: String,
+    pub pin: bool,
+    pub rev: u64,
     pub notes: String,
+}
+
+impl Site {
+    pub fn line_str(&self, name: &str) -> String {
+        format!("{}\t{}", name, self.notes.replace('\t', "▶ "),)
+    }
 }

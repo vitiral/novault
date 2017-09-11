@@ -7,7 +7,7 @@ use types::*;
 
 /// Hash the name and password with other settings
 fn hash(level: u32, name: &str, password: &str, rev: u64, pin: bool) -> String {
-	let base = format!("{}{}{}", rev, name, password);
+    let base = format!("{}{}{}", rev, name, password);
     let mut hashed = openssl::sha::sha512(base.as_ref());
     for _ in 0..(2u64.pow(level)) {
         hashed = openssl::sha::sha512(hashed.as_ref());
@@ -33,10 +33,10 @@ fn test_hash() {
 
         assert_ne!(expect, hash(4, "name", "password", 0, false));
         assert_ne!(expect, hash(0, "name", "password", 0, false));
-        assert_ne!(expect, hash(5, "nam",  "password", 0, false));
-        assert_ne!(expect, hash(5, "name", "assword",  0, false));
+        assert_ne!(expect, hash(5, "nam", "password", 0, false));
+        assert_ne!(expect, hash(5, "name", "assword", 0, false));
         assert_ne!(expect, hash(5, "name", "password", 1, false));
-        assert_ne!(expect, hash(5, "name", "password", 0, true ));
+        assert_ne!(expect, hash(5, "name", "password", 0, true));
     }
     {
         let expect = "5000323459560071975709151365474757802006475730741845631756435134";
@@ -60,35 +60,47 @@ fn test_fmt() {
     let f = |a, b| fmt(a, b).unwrap();
     assert_eq!(f("foo-{p}", "barabado"), "foo-barabado");
     assert_eq!(f("foo-{p:.4}", "barabado"), "foo-bara");
-    assert!(fmt("{p:.3}", "barabado").is_err());             // too short
+    assert!(fmt("{p:.3}", "barabado").is_err()); // too short
     assert!(fmt("long-prefix-{p:.2}", "barabado").is_err()); // pwd too short
 }
 
-pub fn get_master() -> Result<String> {
-	dialoguer::PasswordInput::new("Enter your master password")
-		.interact()
-        .chain_err(|| "OS Error: getting password failed")
+pub fn get_master(stdin: bool) -> Result<String> {
+    let prompt = "Enter your master password";
+    if stdin {
+        eprintln!("{}:", prompt);
+        let mut out = String::with_capacity(128);
+        ::std::io::stdin().read_line(&mut out)?;
+        Ok(out)
+    } else {
+        dialoguer::PasswordInput::new(prompt)
+            .interact()
+            .chain_err(|| "OS Error: getting password failed")
+    }
 }
 
 
 /// Do hash and fmt in one operation
-pub fn fmt_hash(fmt_str: &str, level: u32, name: &str, password: &str, rev: u64, pin: bool)
-        -> Result<String> {
+pub fn fmt_hash(
+    fmt_str: &str,
+    level: u32,
+    name: &str,
+    password: &str,
+    rev: u64,
+    pin: bool,
+) -> Result<String> {
     fmt(fmt_str, &hash(level, name, password, rev, pin))
 }
 
 #[test]
-fn test_fmt_hash() {
-
-}
+fn test_fmt_hash() {}
 
 pub fn check_hash(level: u32, password: &str) -> String {
-	fmt_hash("{p:.16}", level, CHECK_HASH, password, 0, false).unwrap()
+    fmt_hash("{p:.16}", level, CHECK_HASH, password, 0, false).unwrap()
 }
 
 #[test]
 fn test_check_hash() {
-    let expect = "pSR0_-BokRYQ7NfemWE9Zu9lvIXxbff3";
+    let expect = "pSR0_-BokRYQ7Nfe";
     assert_eq!(expect, check_hash(2, "mypass"));
 
     assert_ne!(expect, check_hash(1, "mypass"));
