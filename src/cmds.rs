@@ -2,7 +2,7 @@ use ansi_term::Colour::Green;
 use enigo::{self, KeyboardControllable};
 
 use types::*;
-use utils;
+use secure;
 use chan_signal::{self, Signal};
 
 /// ensure that a name is valid
@@ -14,30 +14,35 @@ fn validate_name(name: &str) -> Result<()> {
     }
 }
 
-fn validate_master(config: &Config, master: &str) -> Result<()> {
-    let settings = &config.settings;
-    let check = utils::check_hash(settings.level, &master);
+/// validate that settings.checkhash is correct
+fn validate_master(settings: &Settings, master: &secure::MasterPass) -> Result<()> {
+    let check = secure::check_hash(settings, master);
     if check != settings.checkhash {
-        bail!(ErrorKind::CheckFailed);
+        bail!(ErrorKind::CheckFailed(
+            check.0.clone(),
+            settings.checkhash.0.clone()
+        ));
     }
     Ok(())
 }
 
 /// Initialize the config file
-pub fn init(global: &OptGlobal, level: u32) -> Result<()> {
+pub fn init(global: &OptGlobal, level: u32, mem: u32, threads: u32) -> Result<()> {
     if global.config.exists() {
         bail!(ErrorKind::ConfigFileExists(global.config.to_path_buf()));
     }
-    let master = utils::get_master(global.stdin)?;
-    if master.len() < 10 {
-        bail!(ErrorKind::InvalidLength);
+    let master = secure::get_master(global.stdin)?;
+
+    let mut settings = Settings {
+        checkhash: CheckHash(String::new()),
+        level: level,
+        mem: mem,
+        threads: threads,
     };
-    let check = utils::check_hash(level, &master);
+
+    settings.checkhash = secure::check_hash(&settings, &master);
     let config = Config {
-        settings: Settings {
-            checkhash: check.to_string(),
-            level: level,
-        },
+        settings: settings,
         sites: BTreeMap::new(),
     };
     let mut f = File::create(&global.config)
@@ -62,15 +67,22 @@ pub fn set(
         bail!(ErrorKind::SiteExists(name.to_string()));
     }
 
-    // just make sure it doesn't fail fmt
-    utils::fmt_hash(fmt, 0, name, "fake-master", rev, pin)?;
+    // requres the salt to be > 8 characters, so just repeat 4 times
+    if name.len() == 0 {
+        bail!(ErrorKind::InvalidSiteName);
+    }
+    let salt = format!("{}{}", name, rev).repeat(4);
 
     let site = Site {
         fmt: fmt.to_string(),
         pin: pin,
         rev: rev,
+        salt: salt,
         notes: notes.to_string(),
     };
+
+    // just make sure it doesn't fail fmt
+    secure::site_pass(&config.settings, &secure::MasterPass::fake(), &site)?;
 
     config.sites.insert(name.to_string(), site);
 
@@ -106,11 +118,13 @@ pub fn set(
 pub fn list(global: &OptGlobal) -> Result<()> {
     // FIXME: use tabwriter
     let config = Config::load(&global.config)?;
-    let mut out = String::from(SITE_HEADER);
+    let mut tw = ::tabwriter::TabWriter::new(Vec::new());
+    write!(&mut tw, "{}", SITE_HEADER)?;
     for (name, site) in config.sites.iter() {
-        write!(&mut out, "\n{}", site.line_str(name))?;
+        write!(&mut tw, "\n{}", site.line_str(name))?;
     }
-    eprintln!("{}", out);
+    let tabbed = String::from_utf8(tw.into_inner().unwrap()).unwrap();
+    eprintln!("{}", tabbed);
     Ok(())
 }
 
@@ -123,12 +137,12 @@ pub fn get(global: &OptGlobal, name: &str) -> Result<()> {
         Some(s) => s,
         None => bail!(ErrorKind::NotFound(name.to_string())),
     };
-    let master = utils::get_master(global.stdin)?;
-    validate_master(&config, &master)?;
+    let master = secure::get_master(global.stdin)?;
+    validate_master(settings, &master)?;
 
-    let password = utils::fmt_hash(&site.fmt, settings.level, name, &master, site.rev, site.pin)?;
+    let password = secure::site_pass(settings, &master, site)?;
     if global.stdout {
-        println!("{}", password);
+        println!("{}", password.audit_this);
         return Ok(());
     }
 
@@ -142,6 +156,6 @@ pub fn get(global: &OptGlobal, name: &str) -> Result<()> {
         .expect("unwrap ok in single thread");
 
     let mut enigo = enigo::Enigo::new();
-    enigo.key_sequence(&password);
+    enigo.key_sequence(&password.audit_this);
     Ok(())
 }

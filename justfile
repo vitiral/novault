@@ -6,8 +6,8 @@ lock = 'target/novault.lock'
 run CMD="":
 	@mkdir -p target
 	@echo "shakeitoff" > {{secret}}
-	cargo build
-	cat {{secret}} | target/debug/novault \
+	cargo build --release
+	cat {{secret}} | target/release/novault \
 		--stdin --stdout --config {{config}} --lock {{lock}} \
 		{{CMD}}
 	@echo "-------- CONFIG --------"

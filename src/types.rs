@@ -2,6 +2,7 @@ pub use std::process::exit;
 
 pub use prelude::*;
 
+pub static ENCRYPT_LEN: usize = 128;
 pub static CHECK_HASH: &str = "__checkhash__";
 
 static INVALID_LEN: &str = "Master password length must be > 10. It is better to make \
@@ -21,6 +22,7 @@ error_chain!{
         Io(::std::io::Error) #[cfg(unix)];
         StrFmt(::strfmt::FmtError);
         Toml(::toml::de::Error);
+        Argon(::argon2rs::ParamErr);
     }
 
     errors {
@@ -32,6 +34,12 @@ error_chain!{
         InvalidLength {
             description("master password length too short")
             display("{}", INVALID_LEN)
+        }
+
+        InvalidSiteName {
+            description("site name length is too short")
+            display("site name must be at least 1 character long")
+
         }
 
         InvalidFmt(fmt: String) {
@@ -50,9 +58,10 @@ error_chain!{
             display("Site '{}' already exists.\nHelp: use -o/--overwrite to overwrite it.", name)
         }
 
-        CheckFailed {
+        CheckFailed(result: String, expected: String) {
             description("master passwords do not match")
-            display("Incorrect password, the original hash does not match")
+            display("Incorrect password, the original hash does not match: {:?} != {:?}",
+                    result, expected)
         }
 
         NotFound(name: String) {
@@ -62,7 +71,30 @@ error_chain!{
     }
 }
 
-/// "global" arguments from the operation
+
+/// "Site Password" type. This exists to avoid confusing it with another string and
+/// to avoid accidentally serializing it.
+///
+/// The data is not as sensitive as the master password, but still should
+/// be audited
+pub struct SitePass {
+    pub audit_this: String,
+}
+
+impl SitePass {
+    pub fn new(s: &str) -> SitePass {
+        SitePass {
+            audit_this: s.to_string(),
+        }
+    }
+}
+
+/// Check Hash type. This exists for validating the master password.  This is the ONLY type that is
+/// allowed to be serialized!
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CheckHash(pub String);
+
+/// "global" arguments from the cmdline options
 pub struct OptGlobal {
     pub config: PathBuf,
     pub stdin: bool,
@@ -71,7 +103,7 @@ pub struct OptGlobal {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
-    pub settings: Settings,
+    #[serde(rename = "!! INITIAL SETTINGS -- DO NOT CHANGE !!")] pub settings: Settings,
     pub sites: BTreeMap<String, Site>,
 }
 
@@ -87,31 +119,57 @@ impl Config {
     }
 
     pub fn dump(&self, file: &mut File) -> Result<()> {
-        file.write_all(::toml::to_string_pretty(self).unwrap().as_ref())?;
+        file.write_all(::toml::to_string(self).unwrap().as_ref())?;
         Ok(())
     }
 }
 
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Settings {
     /// hash of `CHECK_HASH`
-    pub checkhash: String,
+    pub checkhash: CheckHash,
 
     /// number of times a password is re-hashed
     pub level: u32,
+
+    /// memory usage in MiB
+    pub mem: u32,
+
+    /// threads to use
+    pub threads: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+/// The site password is the hash of the MasterPass with the name+rev for the salt
 pub struct Site {
+    #[serde(rename = "!! fmt !!")]
+    /// extra formatting for the password
     pub fmt: String,
+
+    #[serde(rename = "!! pin !!")]
+    /// force the password to be a pin (all digits 0-9)
     pub pin: bool,
+
+    #[serde(rename = "!! rev !!")]
+    /// revision of password, used in the salt
     pub rev: u64,
+
+    #[serde(rename = "!! salt !!")]
+    /// salt, generated from the name
+    pub salt: String,
+
+    /// extra notes for the password, does not affect password
     pub notes: String,
 }
 
 impl Site {
     pub fn line_str(&self, name: &str) -> String {
-        format!("{}\t{}", name, self.notes.replace('\t', "▶ "),)
+        format!(
+            "{}\t{}\t{}",
+            name,
+            self.fmt,
+            self.notes.replace('\t', "▶ "),
+        )
     }
 }

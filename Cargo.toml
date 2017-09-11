@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [dependencies]
 ansi_term = "*"
+argon2rs = "0.2.5"
 base64 = "0.6.0"
 chan-signal = "0.3.1"
 dialoguer = "0.1.0"
@@ -19,4 +20,5 @@ shellexpand = "1.0.0"
 strfmt = "0.1.5"
 structopt = "0.1.0"
 structopt-derive = "0.1.0"
+tabwriter = "1.0.3"
 toml = "0.4.5"

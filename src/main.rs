@@ -1,9 +1,12 @@
 //! NoVault: ultra simple and secure password management
 
+#![recursion_limit = "128"]
+
 // handle signals:
 // https://github.com/BurntSushi/chan-signal
 
 extern crate ansi_term;
+extern crate argon2rs;
 extern crate base64;
 extern crate chan_signal;
 extern crate dialoguer;
@@ -11,7 +14,6 @@ extern crate enigo;
 #[macro_use]
 extern crate error_chain;
 extern crate file_lock;
-extern crate openssl;
 extern crate prelude;
 extern crate serde;
 #[macro_use]
@@ -21,6 +23,7 @@ extern crate strfmt;
 extern crate structopt;
 #[macro_use]
 extern crate structopt_derive;
+extern crate tabwriter;
 extern crate toml;
 
 use structopt::StructOpt;
@@ -29,7 +32,7 @@ use std::os::unix::io::AsRawFd;
 
 mod types;
 mod cmds;
-mod utils;
+mod secure;
 
 use types::*;
 
@@ -64,21 +67,36 @@ enum Command {
     #[structopt(name = "init")]
     /// Initialize the config file
     Init {
-        #[structopt(long = "level", default_value = "20",
+        #[structopt(long = "level", default_value = "7",
                     help = "\
-The password is re-hashed 2 to the power of level (`2^level`) times.
+The level of security to use.
 
-Increasing this number will increase the security of your
-passwords, but also take more time to get a password. The default
-of 20, (about a million times) takes about 1 second to compute on
-my 2 core 800MHz laptop.
+Increasing this number will increase the security of your passwords, but also take more time to get
+a password.
 
-It is recommended that this number NEVER be increased above about 50,
-unless you are storing your passwords on a GPU super computer.
-
-Do NOT change this paramter once initialized, as it will invalidate
-all of your passwords.")]
+Implementation details:
+- For argon2 (default) this is the 'passes' and takes about a second to compute on my
+  laptop.
+")]
         level: u32,
+
+        #[structopt(long = "mem", default_value = "7",
+                    help = "\
+Amount of memory to use in mebibytes (MiB).
+
+Typically you should set this to about about 1/20 of your smallest computer's memory. So if your
+laptop has 8GiB of memory, set it to `8 * 1024 / 20 ~= 400`.
+")]
+        mem: u32,
+
+        #[structopt(long = "threads", default_value = "1",
+                    help = "\
+Number of threads to use.
+
+This should be set to the MINIMUM number of physical CPUS on the computers you use. Typically \"2\"
+is a fairly safe value for modern computers.
+")]
+        threads: u32,
     },
 
     #[structopt(name = "set")]
@@ -86,7 +104,7 @@ all of your passwords.")]
     Set {
         #[structopt(name = "name",
                     help = "\
-Name for the site. Recommended: <username>@<site-url>")]
+Name for the site. Recommended: username@site-url.com")]
         name: String,
 
         #[structopt(short = "o", long = "overwrite",
@@ -125,9 +143,10 @@ Revision number of password, useful for sites that require passwords to change")
 
         #[structopt(short = "n", long = "notes", default_value = "",
                     help = "\
-NOT SECURE: do not store any secrets here. The notes are
-displayed every time a site is accessed.
-This is good for displaying username, etc")]
+Notes about the site -- !! NOT SECURE !!
+
+Do not store any secrets here. The notes are stored in PLAIN TEXT and are  displayed every time a
+site is accessed. I like to use this to remind me what a site is for")]
         notes: String,
     },
 
@@ -184,7 +203,11 @@ fn main() {
     }
 
     let result = match opt.cmd {
-        Command::Init { level } => cmds::init(&global, level),
+        Command::Init {
+            level,
+            mem,
+            threads,
+        } => cmds::init(&global, level, mem, threads),
         Command::Set {
             name,
             overwrite,
