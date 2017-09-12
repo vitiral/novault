@@ -60,7 +60,13 @@ Advantages to NoVault over other password managers:
 > THE SOFTWARE.**
 
 # Guide
-TODO: installation guide
+## Installation
+The only way to install is through cargo:
+```
+cargo install novault
+```
+
+## Basic Use
 
 <a href="https://xkcd.com/936/">
   <img align="right" src="docs/data/attribution/b0rk-design-documents.jpg-larg://imgs.xkcd.com/comics/password_strength.png"

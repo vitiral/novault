@@ -1,10 +1,20 @@
 [package]
-authors = ["Garrett Berg <googberg@gmail.com>"]
+authors = ["Garrett Berg <vitiral@gmail.com>"]
+description = "vaultless password management cli"
+keywords = [
+    "cmdline",
+    "tool",
+    "password",
+    "manager",
+]
+license = "mit"
 name = "novault"
+readme = "README.md"
+repository = "https://github.com/vitiral/novault"
 version = "0.1.0"
 
 [dependencies]
-ansi_term = "*"
+ansi_term = "0.9.0"
 argon2rs = "0.2.5"
 base64 = "0.6.0"
 byteorder = "1.1.0"
