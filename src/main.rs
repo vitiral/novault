@@ -1,13 +1,11 @@
-//! NoVault: ultra simple and secure password management
+//! `novault`: ultra simple and secure password management
 
 #![recursion_limit = "128"]
-
-// handle signals:
-// https://github.com/BurntSushi/chan-signal
 
 extern crate ansi_term;
 extern crate argon2rs;
 extern crate base64;
+extern crate byteorder;
 extern crate chan_signal;
 extern crate dialoguer;
 extern crate enigo;
@@ -15,7 +13,6 @@ extern crate enigo;
 extern crate error_chain;
 extern crate file_lock;
 extern crate prelude;
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate shellexpand;
@@ -67,29 +64,28 @@ enum Command {
     #[structopt(name = "init")]
     /// Initialize the config file
     Init {
-        #[structopt(long = "level", default_value = "7",
+        #[structopt(long = "level", default_value = "15",
                     help = "\
 The level of security to use.
 
 Increasing this number will increase the security of your passwords, but also take more time to get
 a password.
 
-Implementation details:
-- For argon2 (default) this is the 'passes' and takes about a second to compute on my
-  laptop.
+Note that BOTH --mem and --level increase the amount of time it takes to calculate the password.
+
+I am on a 2 core 800MHz laptop and it takes less than a second with the default settings. For me,
+memory > 32 started taking SIGNIFICANTLY longer, so I kept it at 32.
+
+IMO, it is generally not worth it to have the password hashing take more than half a second.
+The added security is not worth the fact that you are less likely to enjoy using the tool.
 ")]
         level: u32,
 
-        #[structopt(long = "mem", default_value = "7",
-                    help = "\
-Amount of memory to use in mebibytes (MiB).
-
-Typically you should set this to about about 1/20 of your smallest computer's memory. So if your
-laptop has 8GiB of memory, set it to `8 * 1024 / 20 ~= 400`.
-")]
+        #[structopt(long = "mem", default_value = "32",
+                    help = "Amount of memory to use in mebibytes (MiB).")]
         mem: u32,
 
-        #[structopt(long = "threads", default_value = "1",
+        #[structopt(long = "threads", default_value = "2",
                     help = "\
 Number of threads to use.
 
@@ -131,9 +127,12 @@ appear.")]
 
         #[structopt(long = "pin",
                     help = "\
-Make the password suitable for pins by only outputting the digits 0-9. This
-only replaces the password, you can still control the length, or add any
-characters you like with --fmt")]
+Make the password suitable for pins by only outputting the digits 0-9.
+
+The length of the generated pin is guaranteed to be 19 characters in length,
+with the high entropy digits at the start (little-endian).
+
+You can control the length or add any characters you like by using --fmt")]
         pin: bool,
 
         #[structopt(short = "r", long = "rev", default_value = "0",
@@ -194,10 +193,11 @@ fn main() {
 
     let lock = Lock::new(lock_file.as_raw_fd());
 
-    if let Err(_) = lock.lock(LockKind::NonBlocking, AccessMode::Write) {
+    if let Err(err) = lock.lock(LockKind::NonBlocking, AccessMode::Write) {
         let msg = format!(
-            "Could not obtain lock for {}.\nHelp: is there another NoVault running?",
-            lock_path.display()
+            "Could not obtain lock for {}: {:?}\nHelp: is there another NoVault running?",
+            lock_path.display(),
+            err
         );
         exit_with_err(&msg);
     }
@@ -231,6 +231,6 @@ fn main() {
 }
 
 fn exit_with_err(msg: &str) {
-    eprintln!("Error\n{}", ansi_term::Colour::Red.bold().paint(msg));
+    eprintln!("Error: {}", ansi_term::Colour::Red.bold().paint(msg));
     exit(1);
 }

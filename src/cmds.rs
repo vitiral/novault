@@ -68,7 +68,7 @@ pub fn set(
     }
 
     // requres the salt to be > 8 characters, so just repeat 4 times
-    if name.len() == 0 {
+    if name.is_empty() {
         bail!(ErrorKind::InvalidSiteName);
     }
     let salt = format!("{}{}", name, rev).repeat(4);
@@ -96,7 +96,7 @@ pub fn set(
 
     let out = config.dump(&mut f);
     if out.is_ok() {
-        let dnotes = if notes.len() == 0 {
+        let dnotes = if notes.is_empty() {
             String::new()
         } else {
             format!("\nnotes={}", notes)
@@ -120,7 +120,7 @@ pub fn list(global: &OptGlobal) -> Result<()> {
     let config = Config::load(&global.config)?;
     let mut tw = ::tabwriter::TabWriter::new(Vec::new());
     write!(&mut tw, "{}", SITE_HEADER)?;
-    for (name, site) in config.sites.iter() {
+    for (name, site) in &config.sites {
         write!(&mut tw, "\n{}", site.line_str(name))?;
     }
     let tabbed = String::from_utf8(tw.into_inner().unwrap()).unwrap();

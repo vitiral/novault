@@ -1,6 +1,11 @@
+//! secure: this file contains the most security related functions.
+//!
+//! ONLY this module should be able to access the actual master password.
+
 use argon2rs;
 use strfmt;
 use base64;
+use byteorder::ByteOrder;
 use dialoguer;
 
 use types::*;
@@ -42,12 +47,8 @@ fn hash(settings: &Settings, master: &MasterPass, site: &Site) -> Result<String>
     );
 
     let out = if site.pin {
-        let mut out = String::new();
-        for d in hashed.iter() {
-            let c = ('0' as u8) + (d % 10u8);
-            out.push(c as char);
-        }
-        out
+        let i: u64 = ::byteorder::LittleEndian::read_u64(&hashed);
+        format!("{:0<19}", i)
     } else {
         base64::encode_config(&hashed, base64::URL_SAFE_NO_PAD)
     };
@@ -113,6 +114,37 @@ fn test_hash() {
     }
 }
 
+#[test]
+/// just a really basic test to make sure pin works at all
+fn test_hash_pin() {
+    {
+        let master = MasterPass::new("masterpassword");
+        let name = "name";
+        let settings = Settings {
+            checkhash: CheckHash(String::new()),
+            level: 1,
+            mem: 10,
+            threads: 1,
+        };
+        let site = Site {
+            fmt: String::new(),
+            pin: true,
+            rev: 0,
+            notes: String::new(),
+            salt: format!("{}{}", name, 0).repeat(4),
+        };
+        let expect = "6011748164651861950";
+        assert_eq!(expect, hash(&settings, &master, &site).unwrap());
+
+        // make sure that small changes change the output
+        {
+            let master = MasterPass::new("otherpassword");
+            assert_ne!(expect, hash(&settings, &master, &site).unwrap());
+        }
+    }
+}
+
+
 /// Format the hash
 fn fmt(fmt_str: &str, hash_str: &str) -> Result<String> {
     let mut m = HashMap::new();
@@ -158,11 +190,7 @@ fn fmt_hash(settings: &Settings, master: &MasterPass, site: &Site) -> Result<Str
 }
 
 /// Just a wrapper to make this all type safe
-pub fn site_pass(
-    settings: &Settings,
-    master: &MasterPass,
-    site: &Site,
-) -> Result<SitePass> {
+pub fn site_pass(settings: &Settings, master: &MasterPass, site: &Site) -> Result<SitePass> {
     Ok(SitePass::new(&fmt_hash(settings, master, site)?))
 }
 

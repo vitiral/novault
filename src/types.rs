@@ -1,3 +1,8 @@
+//! Types for this application.
+//!
+//! The types are expressive, some of them just wrappers around string. This is to avoid
+//! accidentaly using the wrong type in security critical cases.
+
 pub use std::process::exit;
 
 pub use prelude::*;
@@ -141,7 +146,7 @@ pub struct Settings {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-/// The site password is the hash of the MasterPass with the name+rev for the salt
+/// The site password is the hash of the `MasterPass` with the name+rev for the salt
 pub struct Site {
     #[serde(rename = "!! fmt !!")]
     /// extra formatting for the password
