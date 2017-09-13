@@ -155,7 +155,36 @@ pub fn get(global: &OptGlobal, name: &str) -> Result<()> {
         .recv()
         .expect("unwrap ok in single thread");
 
+    sleep(Duration::from_millis(1000));
     let mut enigo = enigo::Enigo::new();
-    enigo.key_sequence(&password.audit_this);
+    for c in password.audit_this.chars() {
+        if is_uppercase(c) {
+            enigo.key_down(enigo::Key::Shift);
+        }
+        enigo.key_down(enigo::Key::Layout(c.to_string()));
+        enigo.key_up(enigo::Key::Layout(c.to_string()));
+        if is_uppercase(c) {
+            enigo.key_up(enigo::Key::Shift);
+        }
+    }
+    // enigo.key_sequence(&password.audit_this);
     Ok(())
 }
+
+// HELPERS
+
+fn is_uppercase(c: char) -> bool {
+    match c {
+        'A' ... 'Z' => true,
+        _ => false,
+    }
+}
+
+#[test]
+fn test_uppercase() {
+    assert!(is_uppercase('A'));
+    assert!(is_uppercase('Z'));
+    assert!(!is_uppercase('a'));
+    assert!(!is_uppercase('z'));
+}
+
