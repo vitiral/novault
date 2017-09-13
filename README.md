@@ -6,7 +6,7 @@ minded people.
 
 As the name implies, NoVault does not require storing your passwords in
 any kind of file or database. Instead, *you* remember a single password,
-which is cryptographically hashed with SHA512 and converted to a string
+which is cryptographically hashed with [Argon2][2] and converted to a string
 using base64url.
 
 NoVault stores your *configuration* in a human readable toml file, which you
