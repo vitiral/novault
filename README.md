@@ -20,7 +20,7 @@ password. Simply grep for `audit_this` to look for all possible places
 that information could leak.
 
 Advantages to NoVault over other password managers:
-- Uses Argon2 for hasing, which is the winner of the [2015 Password Hashing
+- Uses Argon2 for hashing, which is the winner of the [2015 Password Hashing
   Competition][2]
 - Simple: completely open source and less than 1000 lines of code
 - Written in a type safe language (rust)
@@ -68,11 +68,7 @@ cargo install novault
 
 ## Basic Use
 
-<a href="https://xkcd.com/936/">
-  <img align="right" src="docs/data/attribution/b0rk-design-documents.jpg-larg://imgs.xkcd.com/comics/password_strength.png"
-    alt="choosing a good password"
-  >
-</a>
+[![choosing a good password](https://imgs.xkcd.com/comics/password_strength.png)](https://xkcd.com/936/)  
 Initialize your NoVault config file:
 ```
 novault init
@@ -83,12 +79,12 @@ password that you can remember than a short one with lots of symbols. "correct
 horse battery staple" has high entropy but is pretty easy to remember.
 
 Once you have chosen your password, add a site:
-````
+```
 novault set vitiral@gmail.com --notes "open source email"
 ```
 
 Setting the password and 4 digit pin of a bank might be done with:
-````
+```
 novault set vitiral@bank
 novault set vitiral@bank.pin --pin --fmt '{p:.4}'
 ```
