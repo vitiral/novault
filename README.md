@@ -101,15 +101,12 @@ Now you can get the site's password. NoVault will automatically validate that
 your password is the same one you used in `novault init`.
 ```
 novault get vitiral@gmail.com
-novault set myname@bank
-novault set myname@bank.pin --stdout  # just print to stdout
-```
+# ... type in your password
+# ... run "killall -SIGUSR1 -u $USER novault" through a key binding. 
+# ... NoVault will control your keyboard to type in your password securely
 
-Each of these calls (except with `--stdout`) will put NoVault in a "hung
-state". To use your password, bind `killall -SIGUSR1 -u $USER novault` to a key
-(I use `<WINDOWS>p`) and it will control your keyboard to type the password in.
-It will never use your paste buffer and your password will never be in plain
-text.
+novault --stdout get myname@bank.pin  # just print to stdout
+```
 
 The novault config file is stored in `~/.config/novault.toml` by default.
 It is recommended that you back up this file and distribute it among your
