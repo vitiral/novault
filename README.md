@@ -110,8 +110,9 @@ novault --stdout get myname@bank.pin  # just print to stdout
 
 The novault config file is stored in `~/.config/novault.toml` by default.
 It is recommended that you back up this file and distribute it among your
-computers. I prefer to keep it in revision control on a public github repo.
+computers. I prefer to keep it in revision control on a [public github repo][4].
 
 [1]: http://masterpasswordapp.com/
 [2]: https://en.wikipedia.org/wiki/Argon2
 [3]: https://doc.rust-lang.org/std/fmt/
+[4]: https://github.com/vitiral/dotfiles/blob/master/config/novault.toml
