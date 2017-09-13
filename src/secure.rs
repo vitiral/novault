@@ -69,7 +69,6 @@ fn test_hash() {
         let site = Site {
             fmt: String::new(),
             pin: false,
-            rev: 0,
             notes: String::new(),
             salt: format!("{}{}", name, 0).repeat(4),
         };
@@ -129,7 +128,6 @@ fn test_hash_pin() {
         let site = Site {
             fmt: String::new(),
             pin: true,
-            rev: 0,
             notes: String::new(),
             salt: format!("{}{}", name, 0).repeat(4),
         };
@@ -207,7 +205,6 @@ pub fn check_hash(settings: &Settings, master: &MasterPass) -> CheckHash {
         // AT LEAST two passwords.
         fmt: "#- {p:.20} -#".to_string(),
         pin: false,
-        rev: 0,
         notes: "".to_string(),
         salt: format!("{}{}", CHECK_HASH, 0).repeat(4),
     };

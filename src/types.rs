@@ -146,7 +146,7 @@ pub struct Settings {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-/// The site password is the hash of the `MasterPass` with the name+rev for the salt
+/// The site password is the hash of the `MasterPass` + salt
 pub struct Site {
     #[serde(rename = "!! fmt !!")]
     /// extra formatting for the password
@@ -155,10 +155,6 @@ pub struct Site {
     #[serde(rename = "!! pin !!")]
     /// force the password to be a pin (all digits 0-9)
     pub pin: bool,
-
-    #[serde(rename = "!! rev !!")]
-    /// revision of password, used in the salt
-    pub rev: u64,
 
     #[serde(rename = "!! salt !!")]
     /// salt, generated from the name

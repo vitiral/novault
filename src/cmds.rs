@@ -76,7 +76,6 @@ pub fn set(
     let site = Site {
         fmt: fmt.to_string(),
         pin: pin,
-        rev: rev,
         salt: salt,
         notes: notes.to_string(),
     };
