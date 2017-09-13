@@ -20,6 +20,10 @@ password. Simply grep for `audit_this` to look for all possible places
 that information could leak.
 
 Advantages to NoVault over other password managers:
+- Nobody except for *you* knows your password. It is not stored in any
+  database and cannot be leaked.
+- Each website get's its *own individual salted password*. So even if that 
+  password is compromised it *will not compromise your master password*.
 - Uses Argon2 for hashing, which is the winner of the [2015 Password Hashing
   Competition][2]
 - Simple: completely open source and less than 1000 lines of code
