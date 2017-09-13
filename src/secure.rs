@@ -38,10 +38,11 @@ fn hash(settings: &Settings, master: &MasterPass, site: &Site) -> Result<String>
         argon2rs::Variant::Argon2d, // don't care about sidelane atacks
     )?;
     let mut hashed = vec![0u8; ENCRYPT_LEN];
+    let salt = format!("{}{}", settings.unique_name, site.salt);
     ar.hash(
         &mut hashed,
         master.audit_this.as_ref(),
-        site.salt.as_ref(),
+        salt.as_ref(),
         &[], // (optional) secret value  (TODO: what is this?)
         &[], // (optional) data length   (TODO: what is this?)
     );
@@ -61,6 +62,7 @@ fn test_hash() {
         let master = MasterPass::new("masterpassword");
         let name = "name";
         let settings = Settings {
+            unique_name: "username".to_string(),
             checkhash: CheckHash(String::new()),
             level: 1,
             mem: 10,
@@ -72,14 +74,21 @@ fn test_hash() {
             notes: String::new(),
             salt: format!("{}{}", name, 0).repeat(4),
         };
-        let expect = "vkcuqRoFblOqF_vj82fQn7lMjyfvciuE5k-8cd_2gXAXxt9jG_C_xSRqyswc3dwn37g3qYQtqZc2\
-                      mYssHMnJy9gEOXG8aZrGu16jlaia5flqrbTDmxgwj9rcBQY9IvJ1-KRCA4WVzkf-UTHVts4kO0WS\
-                      6s6KPmJi0SUPYkFy3Cs";
+        let expect = "MNCIxnyZJfA4lojGkijpvrxAG_IcYrGium6piMl6fVQKJJG4VkR6XeN9qymeyRvX16JFaL5_-4aj\
+                      yWMUBI6Y9Or2QHy2PWdGv4yGkstu8j9MBcBZjE3KJinA8YIdFrbbe8B28Tj4XenHi1JZVA7VGGFt\
+                      rkNAO22n75aB5xQRmKY";
         assert_eq!(expect, hash(&settings, &master, &site).unwrap());
 
         // make sure that small changes change the output
         {
             let master = MasterPass::new("otherpassword");
+            assert_ne!(expect, hash(&settings, &master, &site).unwrap());
+        }
+        {
+            let settings = Settings {
+                unique_name: "othername".to_string(),
+                ..settings.clone()
+            };
             assert_ne!(expect, hash(&settings, &master, &site).unwrap());
         }
         {
@@ -120,6 +129,7 @@ fn test_hash_pin() {
         let master = MasterPass::new("masterpassword");
         let name = "name";
         let settings = Settings {
+            unique_name: "pinname".to_string(),
             checkhash: CheckHash(String::new()),
             level: 1,
             mem: 10,
@@ -131,7 +141,7 @@ fn test_hash_pin() {
             notes: String::new(),
             salt: format!("{}{}", name, 0).repeat(4),
         };
-        let expect = "6011748164651861950";
+        let expect = "7473749681064788505";
         assert_eq!(expect, hash(&settings, &master, &site).unwrap());
 
         // make sure that small changes change the output
@@ -214,6 +224,7 @@ pub fn check_hash(settings: &Settings, master: &MasterPass) -> CheckHash {
 #[test]
 fn test_check_hash() {
     let settings = Settings {
+        unique_name: "myname".to_string(),
         checkhash: CheckHash(String::new()),
         level: 1,
         mem: 10,
@@ -221,7 +232,7 @@ fn test_check_hash() {
     };
 
     let master = MasterPass::new("checkpassword");
-    let expect = "#- IHhCf7r1yfYoics9iany -#";
+    let expect = "#- SWlwUtXZsWvaPUkWSgNn -#";
     assert_eq!(expect, check_hash(&settings, &master).0);
 
     {

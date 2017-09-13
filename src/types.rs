@@ -132,6 +132,9 @@ impl Config {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Settings {
+    /// user input unique-ish name for salting
+    pub unique_name: String,
+
     /// hash of `CHECK_HASH`
     pub checkhash: CheckHash,
 

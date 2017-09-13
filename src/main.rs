@@ -64,6 +64,20 @@ enum Command {
     #[structopt(name = "init")]
     /// Initialize the config file
     Init {
+        #[structopt(name = "unique-name",
+                    help = "\
+Unique name, must be > 6 characters.
+
+This should be a relatively unique name. It can be your email (vitiral@gmail.com), github url
+(github.com/vitiral), website (vitiral.github.com), twitter handle (@vitiral), or even your full
+name. All that is important is that it is relatively unique and you can remember it!
+
+This information is NOT kept secret! This is added to the salt of your passwords, preventing a
+rainbow table attack against users of NoVault. It is highly recommended that you take it seriously,
+as a rainbow table is the only probable way of breaking NoVault passwords in any large number.
+")]
+        unique_name: String,
+
         #[structopt(long = "level", default_value = "15",
                     help = "\
 The level of security to use.
@@ -204,10 +218,11 @@ fn main() {
 
     let result = match opt.cmd {
         Command::Init {
+            unique_name,
             level,
             mem,
             threads,
-        } => cmds::init(&global, level, mem, threads),
+        } => cmds::init(&global, unique_name, level, mem, threads),
         Command::Set {
             name,
             overwrite,

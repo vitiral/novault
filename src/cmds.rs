@@ -27,19 +27,24 @@ fn validate_master(settings: &Settings, master: &secure::MasterPass) -> Result<(
 }
 
 /// Initialize the config file
-pub fn init(global: &OptGlobal, level: u32, mem: u32, threads: u32) -> Result<()> {
+pub fn init(
+    global: &OptGlobal,
+    unique_name: String,
+    level: u32,
+    mem: u32,
+    threads: u32,
+) -> Result<()> {
     if global.config.exists() {
         bail!(ErrorKind::ConfigFileExists(global.config.to_path_buf()));
     }
     let master = secure::get_master(global.stdin)?;
-
     let mut settings = Settings {
+        unique_name: unique_name,
         checkhash: CheckHash(String::new()),
         level: level,
         mem: mem,
         threads: threads,
     };
-
     settings.checkhash = secure::check_hash(&settings, &master);
     let config = Config {
         settings: settings,
@@ -71,7 +76,7 @@ pub fn set(
     if name.is_empty() {
         bail!(ErrorKind::InvalidSiteName);
     }
-    let salt = format!("{}{}", name, rev).repeat(4);
+    let salt = format!("{}{}", name, rev);
 
     let site = Site {
         fmt: fmt.to_string(),
@@ -174,7 +179,7 @@ pub fn get(global: &OptGlobal, name: &str) -> Result<()> {
 
 fn is_uppercase(c: char) -> bool {
     match c {
-        'A' ... 'Z' => true,
+        'A'...'Z' => true,
         _ => false,
     }
 }
@@ -186,4 +191,3 @@ fn test_uppercase() {
     assert!(!is_uppercase('a'));
     assert!(!is_uppercase('z'));
 }
-
