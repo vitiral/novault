@@ -39,6 +39,7 @@ Advantages to NoVault over other password managers:
 - Can only use on linux
 - Written by a complete amateur over a weekend in his spare time
 - Not even remotely audited by anyone with any cyrptographic knowledge
+- Once you write a password manager you can never trust anyone ever again.
 - Hackers could eat your lunch and I provide no guarantees about the
   waranty or security of this product, so you can't sue me (sorry).
   On that note...
