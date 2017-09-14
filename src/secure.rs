@@ -52,11 +52,11 @@ fn hash(settings: &Settings, master: &MasterPass, secret: &Secret, site: &Site) 
     )?;
     let mut hashed = vec![0u8; ENCRYPT_LEN];
     ar.hash(
-        &mut hashed,                    // output
-        secret.0.as_ref(),              // p: plaintext secret file
-        site.salt.repeat(8).as_ref(),   // s: salt, 16 bytes is recommended
-        master.audit_this.as_ref(),     // k: secret key (master password)
-        &[],                            // x: associated data, not useful for this app
+        &mut hashed,                  // output
+        secret.0.as_ref(),            // p: plaintext secret file
+        site.salt.repeat(8).as_ref(), // s: salt, 16 bytes is recommended
+        master.audit_this.as_ref(),   // k: secret key (master password)
+        &[],                          // x: associated data, not useful for this app
     );
 
     let out = if site.pin {
@@ -132,9 +132,7 @@ pub fn site_pass(
 /// that you input the first time.
 pub fn check_hash(settings: &Settings, master: &MasterPass, secret: &Secret) -> CheckHash {
     let site = Site {
-        // format to 20 characters because it's all we need for password
-        // validation
-        fmt: "#- {p:.20} -#".to_string(),
+        fmt: format!("{{p:.{}}}", CHECK_HASH_LEN),
         pin: false,
         notes: "".to_string(),
         salt: CHECK_HASH.to_string(),
@@ -145,7 +143,7 @@ pub fn check_hash(settings: &Settings, master: &MasterPass, secret: &Secret) -> 
 /// Generate a secret string to be stored on the file system
 pub fn generate_secret() -> Secret {
     let mut gen = ::rand::OsRng::new().expect("Failed to create random number generator");
-    Secret(gen.gen_ascii_chars().take(4096).collect())
+    Secret(gen.gen_ascii_chars().take(SECRET_LEN).collect())
 }
 
 // ##################################################
@@ -155,7 +153,7 @@ pub fn generate_secret() -> Secret {
 /// just testing that it's the right length
 fn test_generate_secret() {
     let secret = generate_secret();
-    assert_eq!(secret.0.len(), 4096, "secret={:?}", secret)
+    assert_eq!(secret.0.len(), SECRET_LEN, "secret={:?}", secret)
 }
 
 #[test]
@@ -164,7 +162,6 @@ fn test_hash() {
     let secret = Secret("very secret secret".to_string());
     let name = "name";
     let settings = Settings {
-        checkhash: CheckHash(String::new()),
         level: 1,
         mem: 10,
         threads: 1,
@@ -186,7 +183,7 @@ fn test_hash() {
         assert_ne!(expect, hash(&settings, &master, &secret, &site).unwrap());
     }
     {
-        let secret = Secret("a".repeat(32));  // max length of 32
+        let secret = Secret("a".repeat(32)); // max length of 32
         assert_ne!(expect, hash(&settings, &master, &secret, &site).unwrap());
     }
     {
@@ -230,7 +227,6 @@ fn test_hash_pin() {
     let secret = Secret("very secret secret".to_string());
     let name = "name";
     let settings = Settings {
-        checkhash: CheckHash(String::new()),
         level: 1,
         mem: 10,
         threads: 1,
@@ -254,7 +250,6 @@ fn test_hash_pin() {
 #[test]
 fn test_check_hash() {
     let settings = Settings {
-        checkhash: CheckHash(String::new()),
         level: 1,
         mem: 10,
         threads: 1,
@@ -262,7 +257,7 @@ fn test_check_hash() {
 
     let master = MasterPass::new("check  password");
     let secret = Secret("very secret secret".to_string());
-    let expect = "#- nxRX0JgmcocSQa6iM7ZB -#";
+    let expect = "nxRX0JgmcocSQa6i";
     assert_eq!(expect, check_hash(&settings, &master, &secret).0);
 
     {

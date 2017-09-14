@@ -7,7 +7,9 @@ pub use std::process::exit;
 
 pub use prelude::*;
 
-pub static ENCRYPT_LEN: usize = 128;
+pub const ENCRYPT_LEN: usize = 128;
+pub const CHECK_HASH_LEN: usize = 16;
+pub const SECRET_LEN: usize = 4096 - CHECK_HASH_LEN;
 pub static CHECK_HASH: &str = "__checkhash__";
 
 const INVALID_LEN: &str = "Master password length must be greather than 10 and less than or \
@@ -79,6 +81,11 @@ error_chain!{
             description("Site not found")
             display("Site {} not found \nHelp: use `list` to list sites", name)
         }
+
+        UnexpectedError(msg: String) {
+            description("unexpected error")
+            display("Encountered an unexpected error: {}", msg)
+        }
     }
 }
 
@@ -102,26 +109,38 @@ impl SitePass {
 
 /// Check Hash type. This exists for validating the master password.  This is the ONLY type that is
 /// allowed to be serialized!
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct CheckHash(pub String);
 
 /// Local secret, stored on the file system.
 ///
-/// This is used as the "salt secret" in the Argon2 algorithm. This
-/// value is 512 characters of random ascii generated from `init`
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+/// This is used as the "plaintext" input in the Argon2 algorithm. This
+/// value is about 4KiB of random ascii generated in `init`
+#[derive(Clone, Debug, PartialEq)]
 pub struct Secret(pub String);
 
 impl Secret {
-    pub fn load(path: &Path) -> Result<Secret> {
+    /// load the secret file, which contains both the secret and the check hash
+    pub fn load(path: &Path) -> Result<(Secret, CheckHash)> {
         let mut f = File::open(path).chain_err(|| format!("Could not open: {}", path.display()))?;
         let mut out = String::new();
         f.read_to_string(&mut out)
             .chain_err(|| format!("Failed to read: {}", path.display()))?;
-        Ok(Secret(out))
+        if out.len() < CHECK_HASH_LEN + 1 {
+            bail!(ErrorKind::UnexpectedError(
+                format!("Secret file is not long enough: {}", out.len())
+            ));
+        }
+        let (check, secret) = out.split_at(CHECK_HASH_LEN);
+        let check = CheckHash(check.to_string());
+        let secret = Secret(secret.to_string());
+        Ok((secret, check))
     }
 
-    pub fn dump(&self, file: &mut File) -> Result<()> {
+    /// store the secret and the check hash together in one file
+    pub fn dump(&self, check: &CheckHash, file: &mut File) -> Result<()> {
+        assert_eq!(check.0.len(), CHECK_HASH_LEN);
+        file.write_all(check.0.as_ref())?;
         file.write_all(self.0.as_ref())?;
         Ok(())
     }
@@ -165,9 +184,6 @@ impl Config {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Settings {
-    /// hash of `CHECK_HASH`
-    pub checkhash: CheckHash,
-
     /// number of times a password is re-hashed
     pub level: u32,
 

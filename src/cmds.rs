@@ -10,29 +10,29 @@ fn validate_master(
     settings: &Settings,
     master: &secure::MasterPass,
     secret: &Secret,
+    check: &CheckHash,
 ) -> Result<()> {
-    let check = secure::check_hash(settings, master, secret);
-    if check != settings.checkhash {
+    let calc_check = secure::check_hash(settings, master, secret);
+    if calc_check != *check {
         bail!(ErrorKind::CheckFailed(
-            check.0.clone(),
-            settings.checkhash.0.clone()
+            calc_check.0.clone(),
+            check.0.clone()
         ));
     }
     Ok(())
 }
 
 /// Parse all possible errors for loading/creating the secret file
-fn init_secret(global: &OptGlobal, use_secret: bool) -> Result<(Secret, bool)> {
-    let mut dump_secret = false;
-    let out = match (global.secret.exists(), use_secret) {
+fn init_secret(global: &OptGlobal, use_secret: bool) -> Result<(Secret, Option<CheckHash>)> {
+    match (global.secret.exists(), use_secret) {
         (true, true) => {
             // secret exists and we should use it
-            Secret::load(&global.secret)?
+            let (secret, check) = Secret::load(&global.secret)?;
+            Ok((secret, Some(check)))
         }
         (false, false) => {
             // secret doesn't exist and we should create it
-            dump_secret = true;
-            secure::generate_secret()
+            Ok((secure::generate_secret(), None))
         }
         (true, false) => {
             // secret exists but we shouln't use it
@@ -44,8 +44,7 @@ fn init_secret(global: &OptGlobal, use_secret: bool) -> Result<(Secret, bool)> {
                 global.secret.to_path_buf()
             ));
         }
-    };
-    Ok((out, dump_secret))
+    }
 }
 
 /// Initialize the config file
@@ -59,15 +58,19 @@ pub fn init(
     if global.config.exists() {
         bail!(ErrorKind::ConfigFileExists(global.config.to_path_buf()));
     }
-    let (secret, dump_secret) = init_secret(global, use_secret)?;
+    let (secret, found_check) = init_secret(global, use_secret)?;
     let master = secure::get_master(global.stdin)?;
-    let mut settings = Settings {
-        checkhash: CheckHash(String::new()),
+    let settings = Settings {
         level: level,
         mem: mem,
         threads: threads,
     };
-    settings.checkhash = secure::check_hash(&settings, &master, &secret);
+    let check = secure::check_hash(&settings, &master, &secret);
+    if let Some(ref c) = found_check {
+        if check != *c {
+            bail!(ErrorKind::CheckFailed(check.0.clone(), c.0.clone()));
+        }
+    }
     let config = Config {
         settings: settings,
         sites: BTreeMap::new(),
@@ -75,10 +78,11 @@ pub fn init(
     // create them both before dumping any
     let mut f = File::create(&global.config)
         .chain_err(|| format!("Could not create: {}", global.config.display()))?;
-    if dump_secret {
+    if found_check.is_none() {
+        // the secret file does not exist yet and needs to be created
         let mut f = File::create(&global.secret)
             .chain_err(|| format!("Could not create: {}", global.secret.display()))?;
-        secret.dump(&mut f)?;
+        secret.dump(&check, &mut f)?;
     }
     config.dump(&mut f)?;
     Ok(())
@@ -163,7 +167,7 @@ pub fn list(global: &OptGlobal) -> Result<()> {
 
 /// get a password and write it using keyboard after -SIGUSR1
 pub fn get(global: &OptGlobal, name: &str) -> Result<()> {
-    let secret = Secret::load(&global.secret)?;
+    let (secret, check) = Secret::load(&global.secret)?;
     let config = Config::load(&global.config)?;
     let settings = &config.settings;
     let site = match config.sites.get(name) {
@@ -171,7 +175,7 @@ pub fn get(global: &OptGlobal, name: &str) -> Result<()> {
         None => bail!(ErrorKind::NotFound(name.to_string())),
     };
     let master = secure::get_master(global.stdin)?;
-    validate_master(settings, &master, &secret)?;
+    validate_master(&settings, &master, &secret, &check)?;
 
     let password = secure::site_pass(settings, &master, &secret, site)?;
     if global.stdout {
