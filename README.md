@@ -88,16 +88,15 @@ This will create two files:
 - `~/.config/novault.toml`: This is the configuration for how to generate your
   passwords. As long as you don't put sensitive information in `notes` or the
   site names, you can store this file anywhere.
-- `~/.local/novault.secret`: This is a randomly generated secret file. It holds
-  the "plaintext" password used in the Argon2 hashing scheme. Keep this file
-  *relatively* secure: only on a usb stick and your filesystems is best,
-  email/dropbox/google drive is probably ok. Whatever you do, DON'T loose this
-  file! The purpose of this file is to make it so that an attacker needs *both*
-  your master-password AND this file in order to crack your passwords. If you
-  accidentally copy/paste your master password into facebook... that is bad.
-  You should change your passwords! But it is unlikely most hackers will be
-  able to compromise you *immediately* since it is unlikely they also have your
-  `novault.secret` file.
+- `~/.local/novault.secret`: This is a randomly generated secret file that is
+  4KiB in size. Keep this file *relatively* secure: only on a usb stick and
+  your filesystems is best, email/dropbox/google drive is probably ok. Whatever
+  you do, DON'T loose this file! The purpose of this file is to make it so that
+  an attacker needs *both* your master-password AND this file in order to crack
+  your passwords. If you accidentally copy/paste your master password into
+  facebook... that is bad.  You should change your passwords! But it is
+  unlikely most hackers will be able to compromise you *immediately* since it
+  is unlikely they also have your `novault.secret` file.
 
 Once you have chosen your password, add a site:
 ```
@@ -133,6 +132,22 @@ The novault config file is stored in `~/.config/novault.toml` by default.
 It is recommended that you back up this file and distribute it among your
 computers. I prefer to keep it in revision control on a [public github
 repo][4].
+
+## What you need to keep/remember
+NEVER forget your password or loose your `~/.local/novault.secret` file.
+If you do your passwords are completely unrecoverable.
+
+Tips:
+- Choose a password that is easy to remember but hard to guess (see above)
+- Store your `novault.secret` file on a USB stick and put it in your dresser
+- Put `novault.secret` on other computers you trust.
+- Print your `novault.secret` to paper and put it somewhere safe as an
+  absolute last resort.
+
+Do NOT share your `novault.secret` file. If you think it is compromised,
+you are probably okay... until you accidentally leak your master password.
+That is the purpose of the `novault.secret` file, it protects you from
+yourself -- and on security matters you are always your own worst enemy.
 
 [1]: http://masterpasswordapp.com/
 [2]: https://en.wikipedia.org/wiki/Argon2
