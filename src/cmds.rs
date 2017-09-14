@@ -5,18 +5,13 @@ use types::*;
 use secure;
 use chan_signal::{self, Signal};
 
-/// ensure that a name is valid
-fn validate_name(name: &str) -> Result<()> {
-    if name == CHECK_HASH {
-        bail!(ErrorKind::InvalidName(name.to_string()));
-    } else {
-        Ok(())
-    }
-}
-
 /// validate that settings.checkhash is correct
-fn validate_master(settings: &Settings, master: &secure::MasterPass) -> Result<()> {
-    let check = secure::check_hash(settings, master);
+fn validate_master(
+    settings: &Settings,
+    master: &secure::MasterPass,
+    secret: &Secret,
+) -> Result<()> {
+    let check = secure::check_hash(settings, master, secret);
     if check != settings.checkhash {
         bail!(ErrorKind::CheckFailed(
             check.0.clone(),
@@ -26,32 +21,65 @@ fn validate_master(settings: &Settings, master: &secure::MasterPass) -> Result<(
     Ok(())
 }
 
+/// Parse all possible errors for loading/creating the secret file
+fn init_secret(global: &OptGlobal, use_secret: bool) -> Result<(Secret, bool)> {
+    let mut dump_secret = false;
+    let out = match (global.secret.exists(), use_secret) {
+        (true, true) => {
+            // secret exists and we should use it
+            Secret::load(&global.secret)?
+        }
+        (false, false) => {
+            // secret doesn't exist and we should create it
+            dump_secret = true;
+            secure::generate_secret()
+        }
+        (true, false) => {
+            // secret exists but we shouln't use it
+            bail!(ErrorKind::SecretFileExists(global.secret.clone()));
+        }
+        (false, true) => {
+            // secret doesn't exist, but we are supposed to use it
+            bail!(ErrorKind::SecretFileDoesNotExists(
+                global.secret.to_path_buf()
+            ));
+        }
+    };
+    Ok((out, dump_secret))
+}
+
 /// Initialize the config file
 pub fn init(
     global: &OptGlobal,
-    unique_name: String,
     level: u32,
     mem: u32,
     threads: u32,
+    use_secret: bool,
 ) -> Result<()> {
     if global.config.exists() {
         bail!(ErrorKind::ConfigFileExists(global.config.to_path_buf()));
     }
+    let (secret, dump_secret) = init_secret(global, use_secret)?;
     let master = secure::get_master(global.stdin)?;
     let mut settings = Settings {
-        unique_name: unique_name,
         checkhash: CheckHash(String::new()),
         level: level,
         mem: mem,
         threads: threads,
     };
-    settings.checkhash = secure::check_hash(&settings, &master);
+    settings.checkhash = secure::check_hash(&settings, &master, &secret);
     let config = Config {
         settings: settings,
         sites: BTreeMap::new(),
     };
+    // create them both before dumping any
     let mut f = File::create(&global.config)
         .chain_err(|| format!("Could not create: {}", global.config.display()))?;
+    if dump_secret {
+        let mut f = File::create(&global.secret)
+            .chain_err(|| format!("Could not create: {}", global.secret.display()))?;
+        secret.dump(&mut f)?;
+    }
     config.dump(&mut f)?;
     Ok(())
 }
@@ -66,27 +94,29 @@ pub fn set(
     fmt: &str,
     notes: &str,
 ) -> Result<()> {
-    validate_name(name)?;
     let mut config = Config::load(&global.config)?;
     if !overwrite && config.sites.contains_key(name) {
         bail!(ErrorKind::SiteExists(name.to_string()));
     }
 
-    // requres the salt to be > 8 characters, so just repeat 4 times
     if name.is_empty() {
         bail!(ErrorKind::InvalidSiteName);
     }
-    let salt = format!("{}{}", name, rev);
 
     let site = Site {
         fmt: fmt.to_string(),
         pin: pin,
-        salt: salt,
+        salt: format!("{}{}", name, rev),
         notes: notes.to_string(),
     };
 
     // just make sure it doesn't fail fmt
-    secure::site_pass(&config.settings, &secure::MasterPass::fake(), &site)?;
+    secure::site_pass(
+        &config.settings,
+        &secure::MasterPass::fake(),
+        &Secret::fake(),
+        &site,
+    )?;
 
     config.sites.insert(name.to_string(), site);
 
@@ -120,7 +150,6 @@ pub fn set(
 
 /// list the available sites
 pub fn list(global: &OptGlobal) -> Result<()> {
-    // FIXME: use tabwriter
     let config = Config::load(&global.config)?;
     let mut tw = ::tabwriter::TabWriter::new(Vec::new());
     write!(&mut tw, "{}", SITE_HEADER)?;
@@ -134,7 +163,7 @@ pub fn list(global: &OptGlobal) -> Result<()> {
 
 /// get a password and write it using keyboard after -SIGUSR1
 pub fn get(global: &OptGlobal, name: &str) -> Result<()> {
-    validate_name(name)?;
+    let secret = Secret::load(&global.secret)?;
     let config = Config::load(&global.config)?;
     let settings = &config.settings;
     let site = match config.sites.get(name) {
@@ -142,9 +171,9 @@ pub fn get(global: &OptGlobal, name: &str) -> Result<()> {
         None => bail!(ErrorKind::NotFound(name.to_string())),
     };
     let master = secure::get_master(global.stdin)?;
-    validate_master(settings, &master)?;
+    validate_master(settings, &master, &secret)?;
 
-    let password = secure::site_pass(settings, &master, site)?;
+    let password = secure::site_pass(settings, &master, &secret, site)?;
     if global.stdout {
         println!("{}", password.audit_this);
         return Ok(());

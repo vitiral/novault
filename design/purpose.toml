@@ -1,0 +1,16 @@
+# project purpose and definition documentation
+
+[REQ-purpose]
+text = '''
+The purpose of this project is...
+'''
+
+[REQ-salt]
+text = '''
+The salt shall always be 16 bytes in length
+
+### References
+Page 4 of https://password-hashing.net/submissions/specs/Argon-v3.pdf
+> Nonce (i.e. salt) S may have any length from 8 to 232 − 1 bytes (16 bytes is
+> recommended for password hashing)
+'''

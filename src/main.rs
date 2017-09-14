@@ -13,6 +13,7 @@ extern crate enigo;
 extern crate error_chain;
 extern crate file_lock;
 extern crate prelude;
+extern crate rand;
 #[macro_use]
 extern crate serde_derive;
 extern crate shellexpand;
@@ -41,11 +42,15 @@ use types::*;
 /// ultra simple and secure vaultless password management
 struct Opt {
     #[structopt(short = "c", long = "config", default_value = "~/.config/novault.toml")]
-    /// Specify an alternate config file to use
+    /// Specify an alternate config file to use.
     config: String,
 
+    #[structopt(short = "s", long = "secret", default_value = "~/.local/novault.secret")]
+    /// Specify an alternate secret file to use.
+    secret: String,
+
     #[structopt(short = "l", long = "lock", default_value = "~/.local/novault.lock")]
-    /// Specify an alternate lock file to use
+    /// Specify an alternate lock file to use.
     lock: String,
 
     #[structopt(long = "stdin")]
@@ -53,7 +58,7 @@ struct Opt {
     stdin: bool,
 
     #[structopt(long = "stdout")]
-    /// !! NOT SECURE !! print password directly to stdout
+    /// !! NOT SECURE !! print password directly to stdout.
     stdout: bool,
 
     #[structopt(subcommand)] cmd: Command,
@@ -64,20 +69,6 @@ enum Command {
     #[structopt(name = "init")]
     /// Initialize the config file
     Init {
-        #[structopt(name = "unique-name",
-                    help = "\
-Unique name, must be > 6 characters.
-
-This should be a relatively unique name. It can be your email (vitiral@gmail.com), github url
-(github.com/vitiral), website (vitiral.github.com), twitter handle (@vitiral), or even your full
-name. All that is important is that it is relatively unique and you can remember it!
-
-This information is NOT kept secret! This is added to the salt of your passwords, preventing a
-rainbow table attack against users of NoVault. It is highly recommended that you take it seriously,
-as a rainbow table is the only probable way of breaking NoVault passwords in any large number.
-")]
-        unique_name: String,
-
         #[structopt(long = "level", default_value = "15",
                     help = "\
 The level of security to use.
@@ -107,6 +98,18 @@ This should be set to the MINIMUM number of physical CPUS on the computers you u
 is a fairly safe value for modern computers.
 ")]
         threads: u32,
+
+        #[structopt(long = "use-secret",
+                    help = "\
+Use the existing secret file (at --secret) instead of autogenerating it.
+
+There are two cases where you might want to do this:
+- If you lost your `novault.toml` but still have your `novault.secret`. This will
+  re-initialize a new `novault.toml` with the correct `checkhash` so you can
+  recover your old file.
+- If you want to use your own 'secret' for some reason.
+")]
+        use_secret: bool,
     },
 
     #[structopt(name = "set")]
@@ -179,10 +182,12 @@ site is accessed. I like to use this to remind me what a site is for")]
 fn main() {
     let opt = Opt::from_args();
     let config = PathBuf::from(shellexpand::tilde(&opt.config).to_string());
+    let secret = PathBuf::from(shellexpand::tilde(&opt.secret).to_string());
     let lock_path = PathBuf::from(shellexpand::tilde(&opt.lock).to_string());
 
     let global = OptGlobal {
         config: config,
+        secret: secret,
         stdin: opt.stdin,
         stdout: opt.stdout,
     };
@@ -218,11 +223,11 @@ fn main() {
 
     let result = match opt.cmd {
         Command::Init {
-            unique_name,
             level,
             mem,
             threads,
-        } => cmds::init(&global, unique_name, level, mem, threads),
+            use_secret,
+        } => cmds::init(&global, level, mem, threads, use_secret),
         Command::Set {
             name,
             overwrite,

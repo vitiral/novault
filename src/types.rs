@@ -10,10 +10,11 @@ pub use prelude::*;
 pub static ENCRYPT_LEN: usize = 128;
 pub static CHECK_HASH: &str = "__checkhash__";
 
-static INVALID_LEN: &str = "Master password length must be > 10. It is better to make \
-                            a long password that you can remember than a short one with \
-                            lots of symbols. \"battery horse loves staple\" has high \
-                            entropy but is reasonably easy to remember.";
+const INVALID_LEN: &str = "Master password length must be greather than 10 and less than or \
+                           equal to 32 bytes. It is better to make a long password that you can \
+                           remember than a short one with lots of symbols. \"battery horse loves \
+                           staple\" has high entropy but is reasonably easy to remember.\n\
+                           Found length: ";
 pub static SITE_HEADER: &str = "NAME\tNOTES";
 
 
@@ -36,9 +37,19 @@ error_chain!{
             display("Config file {} already exists", path.display())
         }
 
-        InvalidLength {
-            description("master password length too short")
-            display("{}", INVALID_LEN)
+        SecretFileExists(path: PathBuf) {
+            description("Secret file already exists")
+            display("Secret file {} already exists", path.display())
+        }
+
+        SecretFileDoesNotExists(path: PathBuf) {
+            description("Secret file doesn't exists")
+            display("Secret file {} already exists", path.display())
+        }
+
+        InvalidLength(len: usize) {
+            description("master password must be between 10 and 32 characters")
+            display("{}{}", INVALID_LEN, len)
         }
 
         InvalidSiteName {
@@ -51,11 +62,6 @@ error_chain!{
             description("Invalid fmt")
             display("{} is an invalid string fmt\nHelp: must have `{{p}}` and use at least 4 \
                     characters of the password", fmt)
-        }
-
-        InvalidName(name: String) {
-            description("Invalid name")
-            display("Name '{}' cannot be used", name)
         }
 
         SiteExists(name: String) {
@@ -99,9 +105,36 @@ impl SitePass {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CheckHash(pub String);
 
+/// Local secret, stored on the file system.
+///
+/// This is used as the "salt secret" in the Argon2 algorithm. This
+/// value is 512 characters of random ascii generated from `init`
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Secret(pub String);
+
+impl Secret {
+    pub fn load(path: &Path) -> Result<Secret> {
+        let mut f = File::open(path).chain_err(|| format!("Could not open: {}", path.display()))?;
+        let mut out = String::new();
+        f.read_to_string(&mut out)
+            .chain_err(|| format!("Failed to read: {}", path.display()))?;
+        Ok(Secret(out))
+    }
+
+    pub fn dump(&self, file: &mut File) -> Result<()> {
+        file.write_all(self.0.as_ref())?;
+        Ok(())
+    }
+
+    pub fn fake() -> Secret {
+        Secret("fake-secret".to_string())
+    }
+}
+
 /// "global" arguments from the cmdline options
 pub struct OptGlobal {
     pub config: PathBuf,
+    pub secret: PathBuf,
     pub stdin: bool,
     pub stdout: bool,
 }
@@ -132,9 +165,6 @@ impl Config {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Settings {
-    /// user input unique-ish name for salting
-    pub unique_name: String,
-
     /// hash of `CHECK_HASH`
     pub checkhash: CheckHash,
 
