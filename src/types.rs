@@ -18,6 +18,8 @@ const INVALID_LEN: &str = "Master password length must be greather than 10 and l
                            staple\" has high entropy but is reasonably easy to remember.\n\
                            Found length: ";
 pub static SITE_HEADER: &str = "NAME\tNOTES";
+pub const INSECURE_MSG: &str = "!!! NOTICE: You are about to perform an insecure operation, be sur\
+                                e you know what you are doing before typing in your password !!!";
 
 
 error_chain!{
@@ -85,6 +87,11 @@ error_chain!{
         UnexpectedError(msg: String) {
             description("unexpected error")
             display("Encountered an unexpected error: {}", msg)
+        }
+
+        InvalidCmd(msg: String) {
+            description("user specified an invalid combination of options")
+            display("{}", msg)
         }
     }
 }

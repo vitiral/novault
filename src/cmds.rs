@@ -1,4 +1,4 @@
-use ansi_term::Colour::Green;
+use ansi_term::Colour::{Green, Red};
 use enigo::{self, KeyboardControllable};
 
 use types::*;
@@ -205,6 +205,35 @@ pub fn get(global: &OptGlobal, name: &str) -> Result<()> {
         }
     }
     // enigo.key_sequence(&password.audit_this);
+    Ok(())
+}
+
+/// Do insecure operations
+pub fn insecure(global: &OptGlobal, export: bool) -> Result<()> {
+    if !export {
+        bail!(ErrorKind::InvalidCmd(
+            "Only --export is currently supported".to_string()
+        ));
+    }
+    let (secret, check) = Secret::load(&global.secret)?;
+    let config = Config::load(&global.config)?;
+    let settings = &config.settings;
+
+    eprintln!("{}", Red.bold().paint(INSECURE_MSG));
+    let master = secure::get_master(global.stdin)?;
+    validate_master(&settings, &master, &secret, &check)?;
+    let msg = Red.bold().paint(
+        "No one can save you now, you are the writer of your own destiny.",
+    );
+    eprintln!("{}", msg);
+
+    let mut passwords: BTreeMap<String, String> = BTreeMap::new();
+    for (name, site) in &config.sites {
+        let p = secure::site_pass(settings, &master, &secret, site)?;
+        passwords.insert(name.clone(), p.audit_this);
+    }
+
+    print!("{}", ::toml::to_string(&passwords).expect("toml failed"));
     Ok(())
 }
 

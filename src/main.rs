@@ -36,7 +36,6 @@ use types::*;
 
 // FIXME: need to add color and some other stuff
 // FIXME: need to preserve order
-// TODO: add shell completions
 #[derive(Debug, StructOpt)]
 #[structopt(name = "novault")]
 /// ultra simple and secure vaultless password management
@@ -177,6 +176,20 @@ site is accessed. I like to use this to remind me what a site is for")]
         /// name for the site to get
         name: String,
     },
+
+    #[structopt(name = "InSeCuRe")]
+    /// Insecure Operations. Don't use these unless something goes wrong.
+    Insecure {
+        #[structopt(long = "export",
+                    help = "
+Export all site passwords to stdout.
+
+This should almost never be done. The only exceptions are:
+- You have to change ALL your passwords.
+- You want to stop using NoVault and are going to store the output in a safe place.
+")]
+        export: bool,
+    },
 }
 
 fn main() {
@@ -238,6 +251,7 @@ fn main() {
         } => cmds::set(&global, &name, overwrite, pin, rev, &fmt, &notes),
         Command::List {} => cmds::list(&global),
         Command::Get { name } => cmds::get(&global, &name),
+        Command::Insecure { export } => cmds::insecure(&global, export),
     };
 
     match result {
