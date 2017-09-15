@@ -4,87 +4,40 @@ use enigo::{self, KeyboardControllable};
 use types::*;
 use secure;
 use chan_signal::{self, Signal};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 /// validate that settings.checkhash is correct
-fn validate_master(
-    settings: &Settings,
-    master: &secure::MasterPass,
-    secret: &Secret,
-    check: &CheckHash,
-) -> Result<()> {
-    let calc_check = secure::check_hash(settings, master, secret);
-    if calc_check != *check {
+fn validate_master(settings: &Settings, master: &secure::MasterPass) -> Result<()> {
+    let calc_check = secure::get_checkhash(settings, master);
+    if calc_check != settings.checkhash {
         bail!(ErrorKind::CheckFailed(
             calc_check.0.clone(),
-            check.0.clone()
+            settings.checkhash.0.clone()
         ));
     }
     Ok(())
 }
 
-/// Parse all possible errors for loading/creating the secret file
-fn init_secret(global: &OptGlobal, use_secret: bool) -> Result<(Secret, Option<CheckHash>)> {
-    match (global.secret.exists(), use_secret) {
-        (true, true) => {
-            // secret exists and we should use it
-            let (secret, check) = Secret::load(&global.secret)?;
-            Ok((secret, Some(check)))
-        }
-        (false, false) => {
-            // secret doesn't exist and we should create it
-            Ok((secure::generate_secret(), None))
-        }
-        (true, false) => {
-            // secret exists but we shouln't use it
-            bail!(ErrorKind::SecretFileExists(global.secret.clone()));
-        }
-        (false, true) => {
-            // secret doesn't exist, but we are supposed to use it
-            bail!(ErrorKind::SecretFileDoesNotExists(
-                global.secret.to_path_buf()
-            ));
-        }
+/// Initialize the sites file
+pub fn init(global: &OptGlobal, level: u32, mem: u32, threads: u32) -> Result<()> {
+    if global.secret.exists() {
+        bail!(ErrorKind::SecretFileExists(global.secret.to_path_buf()));
     }
-}
-
-/// Initialize the config file
-pub fn init(
-    global: &OptGlobal,
-    level: u32,
-    mem: u32,
-    threads: u32,
-    use_secret: bool,
-) -> Result<()> {
-    if global.config.exists() {
-        bail!(ErrorKind::ConfigFileExists(global.config.to_path_buf()));
-    }
-    let (secret, found_check) = init_secret(global, use_secret)?;
+    let secret = secure::generate_secret();
     let master = secure::get_master(global.stdin)?;
-    let settings = Settings {
+    let mut settings = Settings {
         level: level,
         mem: mem,
         threads: threads,
+        checkhash: CheckHash(String::new()),
+        secret: secret,
     };
-    let check = secure::check_hash(&settings, &master, &secret);
-    if let Some(ref c) = found_check {
-        if check != *c {
-            bail!(ErrorKind::CheckFailed(check.0.clone(), c.0.clone()));
-        }
-    }
-    let config = Config {
-        settings: settings,
-        sites: BTreeMap::new(),
-    };
+    settings.checkhash = secure::get_checkhash(&settings, &master);
     // create them both before dumping any
-    let mut f = File::create(&global.config)
-        .chain_err(|| format!("Could not create: {}", global.config.display()))?;
-    if found_check.is_none() {
-        // the secret file does not exist yet and needs to be created
-        let mut f = File::create(&global.secret)
-            .chain_err(|| format!("Could not create: {}", global.secret.display()))?;
-        secret.dump(&check, &mut f)?;
-    }
-    config.dump(&mut f)?;
+    let mut settings_file = File::create(&global.secret)
+        .chain_err(|| format!("Could not create: {}", global.secret.display()))?;
+    dump(&settings, &mut settings_file)?;
     Ok(())
 }
 
@@ -98,8 +51,9 @@ pub fn set(
     fmt: &str,
     notes: &str,
 ) -> Result<()> {
-    let mut config = Config::load(&global.config)?;
-    if !overwrite && config.sites.contains_key(name) {
+    touch(&global.sites)?;
+    let mut sites: Sites = load(&global.sites)?;
+    if !overwrite && sites.contains_key(name) {
         bail!(ErrorKind::SiteExists(name.to_string()));
     }
 
@@ -115,49 +69,41 @@ pub fn set(
     };
 
     // just make sure it doesn't fail fmt
-    secure::site_pass(
-        &config.settings,
-        &secure::MasterPass::fake(),
-        &Secret::fake(),
-        &site,
-    )?;
+    secure::site_pass(&Settings::fake(), &secure::MasterPass::fake(), &site)?;
 
-    config.sites.insert(name.to_string(), site);
+    sites.insert(name.to_string(), site);
 
     let mut f = OpenOptions::new()
         .write(true)
         .truncate(true)
-        .open(&global.config)
+        .open(&global.sites)
         .chain_err(|| {
-            format!("Could not open {} for writing", global.config.display())
+            format!("Could not open {} for writing", global.sites.display())
         })?;
 
-    let out = config.dump(&mut f);
+    let out = dump(&sites, &mut f);
     if out.is_ok() {
-        let dnotes = if notes.is_empty() {
-            String::new()
-        } else {
-            format!("\nnotes={}", notes)
-        };
         let green = Green.bold();
         eprintln!(
-            "Set name={} with settings:\nfmt={} rev={} pin={}{}",
+            "Set name={} with settings:\nfmt={} rev={} pin={}",
             green.paint(name),
             green.paint(fmt),
             green.paint(rev.to_string()),
             green.paint((pin as u8).to_string()),
-            green.paint(dnotes)
         );
+        if !notes.is_empty() {
+            eprintln!("notes={}", green.paint(notes));
+        }
     }
     out
 }
 
 /// list the available sites
 pub fn list(global: &OptGlobal) -> Result<()> {
-    let config = Config::load(&global.config)?;
+    let sites: Sites = load(&global.sites)?;
     let mut tw = ::tabwriter::TabWriter::new(Vec::new());
     write!(&mut tw, "{}", SITE_HEADER)?;
-    for (name, site) in &config.sites {
+    for (name, site) in &sites {
         write!(&mut tw, "\n{}", site.line_str(name))?;
     }
     let tabbed = String::from_utf8(tw.into_inner().unwrap()).unwrap();
@@ -167,17 +113,20 @@ pub fn list(global: &OptGlobal) -> Result<()> {
 
 /// get a password and write it using keyboard after -SIGUSR1
 pub fn get(global: &OptGlobal, name: &str) -> Result<()> {
-    let (secret, check) = Secret::load(&global.secret)?;
-    let config = Config::load(&global.config)?;
-    let settings = &config.settings;
-    let site = match config.sites.get(name) {
+    let settings: Settings = load(&global.secret)?;
+    let sites: Sites = load(&global.sites)?;
+    let site = match sites.get(name) {
         Some(s) => s,
         None => bail!(ErrorKind::NotFound(name.to_string())),
     };
     let master = secure::get_master(global.stdin)?;
-    validate_master(&settings, &master, &secret, &check)?;
+    validate_master(&settings, &master)?;
 
-    let password = secure::site_pass(settings, &master, &secret, site)?;
+    let password = secure::site_pass(&settings, &master, site)?;
+    eprintln!("Getting password for {}", Green.bold().paint(name));
+    if !site.notes.is_empty() {
+        eprintln!("Notes: {}", Green.paint(site.notes.clone()));
+    }
     if global.stdout {
         println!("{}", password.audit_this);
         return Ok(());
@@ -185,26 +134,19 @@ pub fn get(global: &OptGlobal, name: &str) -> Result<()> {
 
     eprintln!(
         "Keybind this command to enter password:\n\n    \
-         killall -SIGUSR1 -u $USER novault"
+         killall -SIGUSR1 -u $USER novault\n\n    \
+         Make SURE you release any keys after running!"
     );
 
     chan_signal::notify(&[Signal::USR1])
         .recv()
         .expect("unwrap ok in single thread");
 
+    eprintln!("Typing password via keyboard in exactly 1 second...");
     sleep(Duration::from_millis(1000));
     let mut enigo = enigo::Enigo::new();
-    for c in password.audit_this.chars() {
-        if is_uppercase(c) {
-            enigo.key_down(enigo::Key::Shift);
-        }
-        enigo.key_down(enigo::Key::Layout(c.to_string()));
-        enigo.key_up(enigo::Key::Layout(c.to_string()));
-        if is_uppercase(c) {
-            enigo.key_up(enigo::Key::Shift);
-        }
-    }
-    // enigo.key_sequence(&password.audit_this);
+    enigo.key_sequence(&password.audit_this);
+    eprintln!("Password for {} has been typed via keyboard.", Green.bold().paint(name));
     Ok(())
 }
 
@@ -215,17 +157,16 @@ pub fn insecure(global: &OptGlobal, export: bool) -> Result<()> {
             "Only --export is currently supported".to_string()
         ));
     }
-    let (secret, check) = Secret::load(&global.secret)?;
-    let config = Config::load(&global.config)?;
-    let settings = &config.settings;
+    let settings: Settings = load(&global.secret)?;
+    let sites: Sites = load(&global.sites)?;
 
     eprintln!("{}", Red.bold().paint(INSECURE_MSG));
     let master = secure::get_master(global.stdin)?;
-    validate_master(&settings, &master, &secret, &check)?;
+    validate_master(&settings, &master)?;
 
     let mut passwords: BTreeMap<String, String> = BTreeMap::new();
-    for (name, site) in &config.sites {
-        let p = secure::site_pass(settings, &master, &secret, site)?;
+    for (name, site) in &sites {
+        let p = secure::site_pass(&settings, &master, site)?;
         passwords.insert(name.clone(), p.audit_this);
     }
 
@@ -235,17 +176,30 @@ pub fn insecure(global: &OptGlobal, export: bool) -> Result<()> {
 
 // HELPERS
 
-fn is_uppercase(c: char) -> bool {
-    match c {
-        'A'...'Z' => true,
-        _ => false,
-    }
+/// Deserialize the path as a toml file
+pub fn load<T>(path: &Path) -> Result<T>
+where
+    T: DeserializeOwned,
+{
+    let mut f = File::open(path).chain_err(|| format!("Could not open: {}", path.display()))?;
+    let mut out = String::new();
+    f.read_to_string(&mut out)
+        .chain_err(|| format!("Failed to read: {}", path.display()))?;
+    ::toml::from_str(&out).chain_err(|| format!("File format is invalid: {}", path.display()))
 }
 
-#[test]
-fn test_uppercase() {
-    assert!(is_uppercase('A'));
-    assert!(is_uppercase('Z'));
-    assert!(!is_uppercase('a'));
-    assert!(!is_uppercase('z'));
+
+/// Serialize the
+pub fn dump<T: Serialize>(value: &T, file: &mut File) -> Result<()> {
+    file.write_all(::toml::to_string(value).unwrap().as_ref())?;
+    Ok(())
+}
+
+
+/// Ensure the file exists
+fn touch(path: &Path) -> Result<()> {
+    match OpenOptions::new().create(true).write(true).open(path) {
+        Ok(_) => Ok(()),
+        Err(e) => bail!(e),
+    }
 }

@@ -14,6 +14,7 @@ extern crate error_chain;
 extern crate file_lock;
 extern crate prelude;
 extern crate rand;
+extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate shellexpand;
@@ -40,11 +41,11 @@ use types::*;
 #[structopt(name = "novault")]
 /// ultra simple and secure vaultless password management
 struct Opt {
-    #[structopt(short = "c", long = "config", default_value = "~/.config/novault.toml")]
-    /// Specify an alternate config file to use.
-    config: String,
+    #[structopt(short = "s", long = "sites", default_value = "~/.config/novault.sites")]
+    /// Specify an alternate sites file to use.
+    sites: String,
 
-    #[structopt(short = "s", long = "secret", default_value = "~/.local/novault.secret")]
+    #[structopt(short = "c", long = "secret", default_value = "~/.local/novault.secret")]
     /// Specify an alternate secret file to use.
     secret: String,
 
@@ -66,7 +67,7 @@ struct Opt {
 #[derive(Debug, StructOpt)]
 enum Command {
     #[structopt(name = "init")]
-    /// Initialize the config file
+    /// Initialize the secret file
     Init {
         #[structopt(long = "level", default_value = "15",
                     help = "\
@@ -97,18 +98,6 @@ This should be set to the MINIMUM number of physical CPUS on the computers you u
 is a fairly safe value for modern computers.
 ")]
         threads: u32,
-
-        #[structopt(long = "use-secret",
-                    help = "\
-Use the existing secret file (at --secret) instead of autogenerating it.
-
-There are two cases where you might want to do this:
-- If you lost your `novault.toml` but still have your `novault.secret`. This will
-  re-initialize a new `novault.toml` with the correct `checkhash` so you can
-  recover your old file.
-- If you want to use your own 'secret' for some reason.
-")]
-        use_secret: bool,
     },
 
     #[structopt(name = "set")]
@@ -127,7 +116,7 @@ requires multiple versions of passwords.
 ")]
         overwrite: bool,
 
-        #[structopt(long = "fmt", default_value = "{p:.20}",
+        #[structopt(long = "fmt", default_value = "{p:.32}",
                     help = "\
 Format to use for the string. This can be used to reduce
 the length of the string and also to add any special
@@ -194,12 +183,12 @@ This should almost never be done. The only exceptions are:
 
 fn main() {
     let opt = Opt::from_args();
-    let config = PathBuf::from(shellexpand::tilde(&opt.config).to_string());
+    let sites = PathBuf::from(shellexpand::tilde(&opt.sites).to_string());
     let secret = PathBuf::from(shellexpand::tilde(&opt.secret).to_string());
     let lock_path = PathBuf::from(shellexpand::tilde(&opt.lock).to_string());
 
     let global = OptGlobal {
-        config: config,
+        sites: sites,
         secret: secret,
         stdin: opt.stdin,
         stdout: opt.stdout,
@@ -239,8 +228,7 @@ fn main() {
             level,
             mem,
             threads,
-            use_secret,
-        } => cmds::init(&global, level, mem, threads, use_secret),
+        } => cmds::init(&global, level, mem, threads),
         Command::Set {
             name,
             overwrite,

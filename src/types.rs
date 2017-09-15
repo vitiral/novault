@@ -9,7 +9,7 @@ pub use prelude::*;
 
 pub const ENCRYPT_LEN: usize = 128;
 pub const CHECK_HASH_LEN: usize = 16;
-pub const SECRET_LEN: usize = 4096 - CHECK_HASH_LEN;
+pub const SECRET_LEN: usize = 256;
 pub static CHECK_HASH: &str = "__checkhash__";
 
 const INVALID_LEN: &str = "Master password length must be greather than 10 and less than or \
@@ -36,18 +36,8 @@ error_chain!{
     }
 
     errors {
-        ConfigFileExists(path: PathBuf) {
-            description("Config file already exists")
-            display("Config file {} already exists", path.display())
-        }
-
         SecretFileExists(path: PathBuf) {
             description("Secret file already exists")
-            display("Secret file {} already exists", path.display())
-        }
-
-        SecretFileDoesNotExists(path: PathBuf) {
-            description("Secret file doesn't exists")
             display("Secret file {} already exists", path.display())
         }
 
@@ -84,11 +74,6 @@ error_chain!{
             display("Site {} not found \nHelp: use `list` to list sites", name)
         }
 
-        UnexpectedError(msg: String) {
-            description("unexpected error")
-            display("Encountered an unexpected error: {}", msg)
-        }
-
         InvalidCmd(msg: String) {
             description("user specified an invalid combination of options")
             display("{}", msg)
@@ -116,42 +101,22 @@ impl SitePass {
 
 /// Check Hash type. This exists for validating the master password.  This is the ONLY type that is
 /// allowed to be serialized!
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CheckHash(pub String);
+
+impl CheckHash {
+    pub fn fake() -> CheckHash {
+        CheckHash("fake-checkhash".to_string())
+    }
+}
 
 /// Local secret, stored on the file system.
 ///
-/// This is used as the "plaintext" input in the Argon2 algorithm. This
-/// value is about 4KiB of random ascii generated in `init`
-#[derive(Clone, Debug, PartialEq)]
+/// This is used as the "plaintext" input in the Argon2 algorithm
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Secret(pub String);
 
 impl Secret {
-    /// load the secret file, which contains both the secret and the check hash
-    pub fn load(path: &Path) -> Result<(Secret, CheckHash)> {
-        let mut f = File::open(path).chain_err(|| format!("Could not open: {}", path.display()))?;
-        let mut out = String::new();
-        f.read_to_string(&mut out)
-            .chain_err(|| format!("Failed to read: {}", path.display()))?;
-        if out.len() < CHECK_HASH_LEN + 1 {
-            bail!(ErrorKind::UnexpectedError(
-                format!("Secret file is not long enough: {}", out.len())
-            ));
-        }
-        let (check, secret) = out.split_at(CHECK_HASH_LEN);
-        let check = CheckHash(check.to_string());
-        let secret = Secret(secret.to_string());
-        Ok((secret, check))
-    }
-
-    /// store the secret and the check hash together in one file
-    pub fn dump(&self, check: &CheckHash, file: &mut File) -> Result<()> {
-        assert_eq!(check.0.len(), CHECK_HASH_LEN);
-        file.write_all(check.0.as_ref())?;
-        file.write_all(self.0.as_ref())?;
-        Ok(())
-    }
-
     pub fn fake() -> Secret {
         Secret("fake-secret".to_string())
     }
@@ -159,35 +124,13 @@ impl Secret {
 
 /// "global" arguments from the cmdline options
 pub struct OptGlobal {
-    pub config: PathBuf,
+    pub sites: PathBuf,
     pub secret: PathBuf,
     pub stdin: bool,
     pub stdout: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Config {
-    #[serde(rename = "!! INITIAL SETTINGS -- DO NOT CHANGE !!")] pub settings: Settings,
-    pub sites: BTreeMap<String, Site>,
-}
-
-impl Config {
-    pub fn load(path: &Path) -> Result<Config> {
-        let mut f = File::open(path).chain_err(|| format!("Could not open: {}", path.display()))?;
-        let mut out = String::new();
-        f.read_to_string(&mut out)
-            .chain_err(|| format!("Failed to read: {}", path.display()))?;
-        ::toml::from_str(&out).chain_err(|| {
-            format!("Config file format is invalid: {}", path.display())
-        })
-    }
-
-    pub fn dump(&self, file: &mut File) -> Result<()> {
-        file.write_all(::toml::to_string(self).unwrap().as_ref())?;
-        Ok(())
-    }
-}
-
+pub type Sites = BTreeMap<String, Site>;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Settings {
@@ -199,6 +142,24 @@ pub struct Settings {
 
     /// threads to use
     pub threads: u32,
+
+    /// Associated checkhash
+    pub checkhash: CheckHash,
+
+    /// Associated secret
+    pub secret: Secret,
+}
+
+impl Settings {
+    pub fn fake() -> Settings {
+        Settings {
+            level: 1,
+            mem: 16,
+            threads: 1,
+            checkhash: CheckHash::fake(),
+            secret: Secret::fake(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

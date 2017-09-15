@@ -1,5 +1,5 @@
 password = 'target/password'
-config = 'target/novault.toml'
+sites = 'target/novault.sites'
 lock = 'target/novault.lock'
 secret = 'target/novault.secret'
 
@@ -9,11 +9,20 @@ run CMD="":
 	@echo "shakeitoff" > {{password}}
 	cargo build --release
 	cat {{password}} | target/release/novault \
-		--stdin --stdout --config {{config}} --lock {{lock}} --secret {{secret}} \
+		--stdin --stdout --sites {{sites}} --lock {{lock}} --secret {{secret}} \
 		{{CMD}}
 	@echo "-------- CONFIG --------"
-	@cat {{config}}
+	@cat {{sites}} || echo "no sites file found"
+	@echo "-------- SECRET --------"
+	@cat {{secret}}
 	@echo "------------------------"
+
+
+run-kill CMD="":
+	cargo build --release
+	cat {{password}} | target/release/novault \
+		--stdin --sites {{sites}} --lock {{lock}} --secret {{secret}} \
+		{{CMD}}
 
 test:
 	cargo test --release

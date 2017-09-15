@@ -42,7 +42,7 @@ impl MasterPass {
 
 
 /// Hash the password
-fn hash(settings: &Settings, master: &MasterPass, secret: &Secret, site: &Site) -> Result<String> {
+fn hash(settings: &Settings, master: &MasterPass, site: &Site) -> Result<String> {
     master.validate()?;
     let ar = argon2rs::Argon2::new(
         settings.level,             // passes
@@ -53,7 +53,7 @@ fn hash(settings: &Settings, master: &MasterPass, secret: &Secret, site: &Site) 
     let mut hashed = vec![0u8; ENCRYPT_LEN];
     ar.hash(
         &mut hashed,                  // output
-        secret.0.as_ref(),            // p: plaintext secret file
+        settings.secret.0.as_ref(),   // p: plaintext secret file
         site.salt.repeat(8).as_ref(), // s: salt, 16 bytes is recommended
         master.audit_this.as_ref(),   // k: secret key (master password)
         &[],                          // x: associated data, not useful for this app
@@ -107,37 +107,27 @@ pub fn get_master(stdin: bool) -> Result<MasterPass> {
 }
 
 /// Do hash and fmt in one operation
-fn fmt_hash(
-    settings: &Settings,
-    master: &MasterPass,
-    secret: &Secret,
-    site: &Site,
-) -> Result<String> {
-    fmt(&site.fmt, &hash(settings, master, secret, site)?)
+fn fmt_hash(settings: &Settings, master: &MasterPass, site: &Site) -> Result<String> {
+    fmt(&site.fmt, &hash(settings, master, site)?)
 }
 
 /// Just a wrapper to make this all type safe
-pub fn site_pass(
-    settings: &Settings,
-    master: &MasterPass,
-    secret: &Secret,
-    site: &Site,
-) -> Result<SitePass> {
-    Ok(SitePass::new(&fmt_hash(settings, master, secret, site)?))
+pub fn site_pass(settings: &Settings, master: &MasterPass, site: &Site) -> Result<SitePass> {
+    Ok(SitePass::new(&fmt_hash(settings, master, site)?))
 }
 
 /// Generate the 'check hash' from the settings.
 ///
 /// This is how novault knows that you are using the same password
 /// that you input the first time.
-pub fn check_hash(settings: &Settings, master: &MasterPass, secret: &Secret) -> CheckHash {
+pub fn get_checkhash(settings: &Settings, master: &MasterPass) -> CheckHash {
     let site = Site {
         fmt: format!("{{p:.{}}}", CHECK_HASH_LEN),
         pin: false,
         notes: "".to_string(),
         salt: CHECK_HASH.to_string(),
     };
-    CheckHash(fmt_hash(settings, master, secret, &site).unwrap())
+    CheckHash(fmt_hash(settings, master, &site).unwrap())
 }
 
 /// Generate a secret string to be stored on the file system
@@ -159,12 +149,13 @@ fn test_generate_secret() {
 #[test]
 fn test_hash() {
     let master = MasterPass::new("master password");
-    let secret = Secret("very secret secret".to_string());
     let name = "name";
     let settings = Settings {
         level: 1,
         mem: 10,
         threads: 1,
+        checkhash: CheckHash::fake(),
+        secret: Secret("very secret secret".to_string()),
     };
     let site = Site {
         fmt: String::new(),
@@ -175,48 +166,51 @@ fn test_hash() {
     let expect = "wk1-JSqyKyV1ker9Qt_FpnlMuY2ElDmQJmtYRV7wggMILD3Cucn4edSlucX9sAm614gj3iB0zWY0_0lv\
                   dBJVTowHyFrJvZg9FY567I4ZsOjQ87ZBcTiLfYIrnLnh5ar4JHdFhCKDPc8zGN9NpCPYCi7r_p1HGZyM\
                   X32YBNesCNU";
-    assert_eq!(expect, hash(&settings, &master, &secret, &site).unwrap());
+    assert_eq!(expect, hash(&settings, &master, &site).unwrap());
 
     // make sure that small changes change the output
     {
         let master = MasterPass::new("other  password");
-        assert_ne!(expect, hash(&settings, &master, &secret, &site).unwrap());
+        assert_ne!(expect, hash(&settings, &master, &site).unwrap());
     }
     {
-        let secret = Secret("a".repeat(32)); // max length of 32
-        assert_ne!(expect, hash(&settings, &master, &secret, &site).unwrap());
+        let settings = Settings {
+            secret: Secret("other very secret secret".to_string()),
+            ..settings.clone()
+        };
+        assert_ne!(expect, hash(&settings, &master, &site).unwrap());
     }
     {
         let settings = Settings {
             level: 2,
             ..settings.clone()
         };
-        assert_ne!(expect, hash(&settings, &master, &secret, &site).unwrap());
+        assert_ne!(expect, hash(&settings, &master, &site).unwrap());
     }
     {
         let settings = Settings {
             mem: 9,
             ..settings.clone()
         };
-        assert_ne!(expect, hash(&settings, &master, &secret, &site).unwrap());
+        assert_ne!(expect, hash(&settings, &master, &site).unwrap());
     }
     {
         let settings = Settings {
             threads: 2,
             ..settings.clone()
         };
-        assert_ne!(expect, hash(&settings, &master, &secret, &site).unwrap());
+        assert_ne!(expect, hash(&settings, &master, &site).unwrap());
     }
     {
         let site = Site {
             salt: "someothersalt".to_string(),
             ..site.clone()
         };
-        assert_ne!(expect, hash(&settings, &master, &secret, &site).unwrap());
+        assert_ne!(expect, hash(&settings, &master, &site).unwrap());
     }
     {
         let master = MasterPass::new(&"a".repeat(33));
-        assert!(hash(&settings, &master, &secret, &site).is_err());
+        assert!(hash(&settings, &master, &site).is_err());
     }
 }
 
@@ -224,12 +218,13 @@ fn test_hash() {
 /// just a really basic test to make sure pin works at all
 fn test_hash_pin() {
     let master = MasterPass::new("master password");
-    let secret = Secret("very secret secret".to_string());
     let name = "name";
     let settings = Settings {
         level: 1,
         mem: 10,
         threads: 1,
+        checkhash: CheckHash::fake(),
+        secret: Secret("very secret secret".to_string()),
     };
     let site = Site {
         fmt: String::new(),
@@ -238,51 +233,52 @@ fn test_hash_pin() {
         salt: format!("{}{}", name, 0).repeat(4),
     };
     let expect = "2678430297489296834";
-    assert_eq!(expect, hash(&settings, &master, &secret, &site).unwrap());
+    assert_eq!(expect, hash(&settings, &master, &site).unwrap());
 
     // make sure that small changes change the output
     {
         let master = MasterPass::new("other  password");
-        assert_ne!(expect, hash(&settings, &master, &secret, &site).unwrap());
+        assert_ne!(expect, hash(&settings, &master, &site).unwrap());
     }
 }
 
 #[test]
-fn test_check_hash() {
+fn test_checkhash() {
     let settings = Settings {
         level: 1,
         mem: 10,
         threads: 1,
+        checkhash: CheckHash::fake(),
+        secret: Secret("very secret secret".to_string()),
     };
 
     let master = MasterPass::new("check  password");
-    let secret = Secret("very secret secret".to_string());
     let expect = "nxRX0JgmcocSQa6i";
-    assert_eq!(expect, check_hash(&settings, &master, &secret).0);
+    assert_eq!(expect, get_checkhash(&settings, &master).0);
 
     {
         let master = MasterPass::new("other check for password");
-        assert_ne!(expect, check_hash(&settings, &master, &secret).0);
+        assert_ne!(expect, get_checkhash(&settings, &master).0);
     }
     {
         let settings = Settings {
             level: 2,
             ..settings.clone()
         };
-        assert_ne!(expect, check_hash(&settings, &master, &secret).0);
+        assert_ne!(expect, get_checkhash(&settings, &master).0);
     }
     {
         let settings = Settings {
             mem: 9,
             ..settings.clone()
         };
-        assert_ne!(expect, check_hash(&settings, &master, &secret).0);
+        assert_ne!(expect, get_checkhash(&settings, &master).0);
     }
     {
         let settings = Settings {
             threads: 2,
             ..settings.clone()
         };
-        assert_ne!(expect, check_hash(&settings, &master, &secret).0);
+        assert_ne!(expect, get_checkhash(&settings, &master).0);
     }
 }
