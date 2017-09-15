@@ -158,10 +158,10 @@ Revision number of password, useful for sites that require passwords to change")
 
         #[structopt(short = "n", long = "notes", default_value = "",
                     help = "\
-Notes about the site -- !! NOT SECURE !!
+Notes about the site.
 
-Do not store any secrets here. The notes are stored in PLAIN TEXT and are  displayed every time a
-site is accessed. I like to use this to remind me what a site is for")]
+Do not store any secrets here. The notes are stored in PLAIN TEXT and are displayed every time a
+site is accessed. I like to use this to remind me what a site is for.")]
         notes: String,
     },
 
@@ -181,11 +181,11 @@ site is accessed. I like to use this to remind me what a site is for")]
     /// Insecure Operations. Don't use these unless something goes wrong.
     Insecure {
         #[structopt(long = "export",
-                    help = "
+                    help = "\
 Export all site passwords to stdout.
 
 This should almost never be done. The only exceptions are:
-- You have to change ALL your passwords.
+- You have to change ALL your passwords, and want a reference while you do so.
 - You want to stop using NoVault and are going to store the output in a safe place.
 ")]
         export: bool,

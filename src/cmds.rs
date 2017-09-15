@@ -222,10 +222,6 @@ pub fn insecure(global: &OptGlobal, export: bool) -> Result<()> {
     eprintln!("{}", Red.bold().paint(INSECURE_MSG));
     let master = secure::get_master(global.stdin)?;
     validate_master(&settings, &master, &secret, &check)?;
-    let msg = Red.bold().paint(
-        "No one can save you now, you are the writer of your own destiny.",
-    );
-    eprintln!("{}", msg);
 
     let mut passwords: BTreeMap<String, String> = BTreeMap::new();
     for (name, site) in &config.sites {
