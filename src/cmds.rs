@@ -3,7 +3,6 @@ use enigo::{self, KeyboardControllable};
 
 use types::*;
 use secure;
-use chan_signal::{self, Signal};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
@@ -133,20 +132,25 @@ pub fn get(global: &OptGlobal, name: &str) -> Result<()> {
     }
 
     eprintln!(
-        "Keybind this command to enter password:\n\n    \
-         killall -SIGUSR1 -u $USER novault\n\n    \
-         Make SURE you release any keys after running!"
+        "Password ready. Keybind this command to use the password:\n\n    \
+         echo \"ok\" >> {:?}\n\n\
+         Make SURE you release any keys after running!",
+        global.lock_path
     );
 
-    chan_signal::notify(&[Signal::USR1])
-        .recv()
-        .expect("unwrap ok in single thread");
+    while global.lock_file.metadata()?.len() == 0 {
+        sleep(Duration::from_millis(100));
+    }
 
     eprintln!("Typing password via keyboard in exactly 1 second...");
     sleep(Duration::from_millis(1000));
+
     let mut enigo = enigo::Enigo::new();
     enigo.key_sequence(&password.audit_this);
-    eprintln!("Password for {} has been typed via keyboard.", Green.bold().paint(name));
+    eprintln!(
+        "Password for {} has been typed via keyboard.",
+        Green.bold().paint(name)
+    );
     Ok(())
 }
 

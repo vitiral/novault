@@ -189,20 +189,13 @@ fn main() {
     let secret = PathBuf::from(shellexpand::tilde(&opt.secret).to_string());
     let lock_path = PathBuf::from(shellexpand::tilde(&opt.lock).to_string());
 
-    let global = OptGlobal {
-        sites: sites,
-        secret: secret,
-        stdin: opt.stdin,
-        stdout: opt.stdout,
-    };
-
     if !lock_path.exists() {
         OpenOptions::new()
             .create(true)
             .write(true)
             .open(&lock_path)
             .expect(&format!(
-                "could not create lock file: {}",
+                "Could not create lock file: {}",
                 lock_path.display()
             ));
     }
@@ -215,7 +208,6 @@ fn main() {
         ));
 
     let lock = Lock::new(lock_file.as_raw_fd());
-
     if let Err(err) = lock.lock(LockKind::NonBlocking, AccessMode::Write) {
         let msg = format!(
             "Could not obtain lock for {}: {:?}\nHelp: is there another NoVault running?",
@@ -224,6 +216,16 @@ fn main() {
         );
         exit_with_err(&msg);
     }
+    lock_file.set_len(0).expect("Could not truncate lock file.");
+
+    let global = OptGlobal {
+        sites: sites,
+        secret: secret,
+        lock_path: lock_path,
+        lock_file: lock_file,
+        stdin: opt.stdin,
+        stdout: opt.stdout,
+    };
 
     let result = match opt.cmd {
         Command::Init {

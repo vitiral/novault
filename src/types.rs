@@ -126,6 +126,8 @@ impl Secret {
 pub struct OptGlobal {
     pub sites: PathBuf,
     pub secret: PathBuf,
+    pub lock_path: PathBuf,
+    pub lock_file: File,
     pub stdin: bool,
     pub stdout: bool,
 }
