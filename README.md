@@ -85,10 +85,7 @@ This will ask for a password, choose a good one.  It is better to make a long
 password that you can remember than a short one with lots of symbols. "correct
 horse battery staple" has high entropy but is pretty easy to remember.
 
-This will create two files:
-- `~/.config/novault.toml`: This is the configuration for how to generate your
-  passwords. As long as you don't put sensitive information in `notes` or the
-  site names, you can store this file anywhere.
+This will create a secret file at
 - `~/.local/novault.secret`: This is a randomly generated secret file that is
   4KiB in size. Keep this file *relatively* secure: only on a usb stick and
   your filesystems is best, email/dropbox/google drive is probably ok. Whatever
@@ -104,7 +101,14 @@ Once you have chosen your password, add a site:
 novault set vitiral@gmail.com --notes "open source email"
 ```
 
-Setting the password and 4 digit pin of a bank might be done with:
+After you have added your first site, a file will be created at
+`~/.config/novault.toml`. This does not contain ANY information that could be
+used to derive your masterpassword, therefore it is safe to store in a public
+place (like github).
+
+For another example, setting the password and 4 digit pin of a bank might be
+done with:
+
 ```
 novault set vitiral@bank
 novault set pin.vitiral@bank --pin --fmt '{p:.4}'
@@ -112,11 +116,11 @@ novault set pin.vitiral@bank --pin --fmt '{p:.4}'
 
 > The `{...}` syntax is the same as [rust/pthon's string fmt syntax][3].
 > `p` is the name of the password and everything after `:` tells how to format
-> `p`. `:.4` says to use "precision 4" which in this case means string length
-> of 4. If your site requires special characters you can add them like
-> `--fmt '{p:.20}!@#'`. Obviously the characters don't provide extra security...
-> but you are using a 20 digit random hash which is about as secure as anything
-> can be.
+> `p`. `:.4` says to use "precision 4" which for strings (which `p` is) means
+> string length of 4. If your site requires special characters you can add them
+> like `--fmt '{p:.32}!@#'`. Obviously the characters don't provide extra
+> security...  but you are using a 32 digit random hash which is about as
+> secure as anything can be.
 
 Now you can get the site's password. NoVault will automatically validate that
 your password is the same one you used in `novault init`.

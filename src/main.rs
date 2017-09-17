@@ -102,6 +102,8 @@ is a fairly safe value for modern computers.
 
     #[structopt(name = "set")]
     /// Create or change a site's settings
+    // TODO: --rev and --notes should not be changed on overwrite
+    // if they are not given.
     Set {
         #[structopt(name = "name",
                     help = "\

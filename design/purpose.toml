@@ -1,16 +1,71 @@
-# project purpose and definition documentation
-
 [REQ-purpose]
 text = '''
-The purpose of this project is...
+NoVault is a command line password manager that intends to be:
+- [[REQ-cli]]: As simple as possible: no extra features and a minimalist API
+  surface.
+- [[REQ-security]]: As secure as possible: use the most cutting edge
+  cryptography and have highly secure defaults.
+- [[SPC-embedded]]: Designed to be embeddable: additional complexity can be
+  obtained by embedding NoVault in a larger applicaion.
 '''
 
-[REQ-salt]
+[REQ-security]
+partof = "REQ-purpose"
 text = '''
-The salt shall always be 16 bytes in length
+In order to obtain the highest possible security, NoVault will
+utilize the following security best practices:
+- A modern hashing algorithm, in this case Argon2
+- [[REQ-security-user]]: A single master password and secret file is all a user needs
+  to retrieve *any password they have ever created*.
+- Passwords shall never be output to plain text or exposed in a paste buffer --
+  NoVault will type them in for the user.
+- A type safe language shall be used with appropriate privacy and serialization
+  settings for security critical types.
+'''
 
-### References
-Page 4 of https://password-hashing.net/submissions/specs/Argon-v3.pdf
-> Nonce (i.e. salt) S may have any length from 8 to 232 − 1 bytes (16 bytes is
-> recommended for password hashing)
+[REQ-security-user]
+text = '''
+As [[REQ-security]] says, NoVault requires a user to have *only* a single
+master password and store a single secret file (created at init time) to obtain
+*any* password they have created.
+
+This may seem like a "user interface" requirement, but it is far more a
+security related concern. Password managers which store randomly generated user
+passwords in a "vault" (we will call them "vaulted password managers") are
+destructive for user security because they make them scared of loosing their
+vault. If the vault is gone, so are the passwords.
+
+To avoid this catastrophy, users store their vault on site-sharing places like
+google drive or even github, exposing their passwords to offline attacks.
+
+By contrast, if all you need is to remember a single master password and back
+up a single secret file*one time* (it never has to be changed or updated) means
+that you no longer have to fear loosing any kind of "vault". Set up your
+master password and secret file *one time* and even if you loose a site's
+config you only have to remember the *name* you used for the site in order
+to recover its password.
+'''
+
+[SPC-embedded]
+partof = "REQ-purpose"
+text = '''
+It shall be extremely easy to embed NoVault within other applications using
+only stdin and stdout.
+
+Many password managers make this extremely difficult to do because they do not
+accept passwords over stdin. While it is *generally* a bad idea to send your
+password over stdin (as it means you have either stored the password in a file
+or a bash variable), it is perfectly acceptable to have an *application* which
+uses NoVault as the security kernel do so.
+
+Therefore, the [[SPC-cli]] implements the global flags `--stdin` and --stdout`
+to allow external applications to control it directly. When using these flags,
+the output should *never* be printed by the external application, as that
+is extraordinarily insecure.
+
+### Future Development
+In the future, it may also implement a `novault verify` sub command which will
+allow user applications to verify an input master-password, as well as a
+`--no-verify` flag to disable subsequent verification. This is *not* a high
+priority feature
 '''
