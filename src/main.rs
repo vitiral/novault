@@ -6,7 +6,6 @@ extern crate ansi_term;
 extern crate argon2rs;
 extern crate base64;
 extern crate byteorder;
-extern crate chan_signal;
 extern crate dialoguer;
 extern crate enigo;
 #[macro_use]
