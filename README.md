@@ -1,5 +1,9 @@
 # NoVault: ultra simple and secure password management
 
+> Note: as of version 0.4.0 it is not expected that there will be breaking
+> changes to this tool. I am now using novault as my own primary password
+> manager.
+
 NoVault is an ultra simple and secure password manager similar to [Master
 Password][1] but made to be much simpler and more auditable for developer
 minded people.
