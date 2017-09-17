@@ -17,7 +17,7 @@ const INVALID_LEN: &str = "Master password length must be greather than 10 and l
                            remember than a short one with lots of symbols. \"battery horse loves \
                            staple\" has high entropy but is reasonably easy to remember.\n\
                            Found length: ";
-pub static SITE_HEADER: &str = "NAME\tNOTES";
+pub static SITE_HEADER: &str = "NAME\tFMT\tSALT\tNOTES\n----\t---\t----\t-----";
 pub const INSECURE_MSG: &str = "!!! NOTICE: You are about to perform an insecure operation, be sur\
                                 e you know what you are doing before typing in your password !!!";
 
@@ -186,9 +186,10 @@ pub struct Site {
 impl Site {
     pub fn line_str(&self, name: &str) -> String {
         format!(
-            "{}\t{}\t{}",
+            "{}\t{}\t{}\t{}",
             name,
             self.fmt,
+            self.salt,
             self.notes.replace('\t', "▶ "),
         )
     }
