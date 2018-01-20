@@ -15,7 +15,7 @@ using base64url. You only have to (semi-securely) share a tiny `novault.secret`
 file that gets generated at init time among your devices.
 
 NoVault stores your *configuration* and sites in a human readable toml file,
-which you can save on sites like google drive, dropbox or even publically on
+which you can save on sites like google drive, dropbox or even publicly on
 github.
 
 Advantages to NoVault over other password managers:
@@ -31,18 +31,18 @@ Advantages to NoVault over other password managers:
 - Your passwords never exist in plain text, html or paste buffer -- NoVault
   takes control of your *keyboard* to enter the passwords.
 - It is safe to store your configuration in plain text anywhere, so it is
-  easy to keep it in sync accross your computers. Even if you DO loose
+  easy to keep it in sync across your computers. Even if you DO loose
   your `novault.sites` file, you only typically only need to remember the
   site name to recover the password.
 - Written in a type safe language (rust)
 
 (current) disadvantages:
-- Can only use on linux
+- Can only use on GNU/Linux
 - Written by a complete amateur over a weekend in his spare time
-- Not even remotely audited by anyone with any cyrptographic knowledge
+- Not even remotely audited by anyone with any cryptographic knowledge
 - Once you write a password manager you can never trust anyone ever again.
 - Hackers could eat your lunch and I provide no guarantees about the
-  waranty or security of this software, so you can't sue me (sorry).
+  warranty or security of this software, so you can't sue me (sorry).
   On that note...
 
 > **The MIT License (MIT)
@@ -93,7 +93,7 @@ Keep this file *relatively* secure (see the "What you need to keep/remember"
 section below). Whatever you do, DON'T loose this file! The purpose of it
 is to make it so that an attacker needs *both* your master-password AND
 this file in order to crack your passwords. If you accidentally copy/paste your
-master password into facebook then that is bad but you don't have to completely
+master password into Facebook then that is bad but you don't have to completely
 freak out. See section "I lost my master password..." below.
 
 Once you have chosen your password, add a site:
@@ -104,7 +104,7 @@ novault set vitiral@gmail.com --notes "open source email"
 After you have added your first site, a file will be created at
 `~/.config/novault.sites`. This does not contain ANY information that could be
 used to derive your masterpassword, therefore it is safe to store in a public
-place (like github).
+place (like GitHub).
 
 For another example, setting the password and 4 digit pin of a bank might be
 done with:
@@ -136,7 +136,7 @@ novault --stdout get pin.vitiral@bank  # just print to stdout
 
 The sites you have added are stored in `~/.config/novault.sites` by default.
 It is recommended that you back up this file and distribute it among your
-computers. I prefer to keep it in revision control on a [public github
+computers. I prefer to keep it in revision control on a [public GitHub
 repo][4].
 
 ## What you need to keep/remember
@@ -178,7 +178,7 @@ Probably a good idea to have a new master password.
 So, you have to change your master password but there is no rush. How do you
 do it?
 
-### Step 1: make a backup of your existin passwords
+### Step 1: make a backup of your existing passwords
 Run the following:
 
 ```
