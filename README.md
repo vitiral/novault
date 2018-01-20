@@ -9,27 +9,27 @@ Password][1] but made to be much simpler and more auditable for developer
 minded people.
 
 As the name implies, NoVault does not require storing your passwords in
-any kind of file or database. Instead, *you* remember a single password,
+any kind of file or database. Instead, _you_ remember a single password,
 which is cryptographically hashed with [Argon2][2] and converted to a string
 using base64url. You only have to (semi-securely) share a tiny `novault.secret`
 file that gets generated at init time among your devices.
 
-NoVault stores your *configuration* and sites in a human readable toml file,
+NoVault stores your _configuration_ and sites in a human readable toml file,
 which you can save on sites like google drive, dropbox or even publicly on
-github.
+GitHub.
 
 Advantages to NoVault over other password managers:
 - Simple: completely open source and about 1000 lines of code
 - Uses Argon2 for hashing, which is the winner of the [2015 Password Hashing
   Competition][2]
-- Nobody except for *you* knows your password. It is not stored in any
+- Nobody except for _you_ knows your password. It is not stored in any
   database and cannot be leaked by the application.
-- NoVault will *never* access the internet, so that eliminates an entire
+- NoVault will _never_ access the internet, so that eliminates an entire
   world of security vulnerabilities.
-- Each website get's its *own individual salted password*. So even if that
-  password is compromised it *will not compromise your master password*.
+- Each website get's its _own individual salted password_. So even if that
+  password is compromised it _will not compromise your master password_.
 - Your passwords never exist in plain text, html or paste buffer -- NoVault
-  takes control of your *keyboard* to enter the passwords.
+  takes control of your _keyboard_ to enter the passwords.
 - It is safe to store your configuration in plain text anywhere, so it is
   easy to keep it in sync across your computers. Even if you DO loose
   your `novault.sites` file, you only typically only need to remember the
@@ -37,7 +37,7 @@ Advantages to NoVault over other password managers:
 - Written in a type safe language (rust)
 
 (current) disadvantages:
-- Can only use on GNU/Linux
+- Can only be used on GNU/Linux
 - Written by a complete amateur over a weekend in his spare time
 - Not even remotely audited by anyone with any cryptographic knowledge
 - Once you write a password manager you can never trust anyone ever again.
@@ -45,7 +45,7 @@ Advantages to NoVault over other password managers:
   warranty or security of this software, so you can't sue me (sorry).
   On that note...
 
-> **The MIT License (MIT)
+> _The MIT License (MIT)
 >
 > Copyright (c) 2017 Garrett Berg, vitiral@gmail.com
 >
@@ -65,7 +65,7 @@ Advantages to NoVault over other password managers:
 > AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 > LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-> THE SOFTWARE.**
+> THE SOFTWARE._
 
 # Guide
 ## Installation
@@ -89,11 +89,11 @@ long password that you can remember than a short one with lots of symbols.
 "correct horse battery staple" has high entropy but is pretty easy to remember.
 
 This will create a randomly generated secret file at `~/.local/novault.secret`.
-Keep this file *relatively* secure (see the "What you need to keep/remember"
+Keep this file _relatively_ secure (see the "What you need to keep/remember"
 section below). Whatever you do, DON'T loose this file! The purpose of it
-is to make it so that an attacker needs *both* your master-password AND
+is to make it so that an attacker needs _both_ your master-password AND
 this file in order to crack your passwords. If you accidentally copy/paste your
-master password into Facebook then that is bad but you don't have to completely
+master password into Facebook, then that is bad... but you don't have to completely
 freak out. See section "I lost my master password..." below.
 
 Once you have chosen your password, add a site:
@@ -162,18 +162,18 @@ you are always your own worst enemy.
 > Note: changing your secret file is the same as changing your master password,
 > ALL site passwords will change as well.
 
-## I exposed my master password, what do I do?
+## I exposed my master password or secret file, what do I do?
 You need to change it, but you can probably finish your cup of coffee first.
 
-The truth is, as long as attackers don't ALSO have your `novault.secret` file
+The truth is, as long as attackers don't hve BOTH your master password and your `novault.secret` file
 then there is literally no way on earth they will be able to do anything. The
 secret file contains a 256 character randomly generated ASCII string, which
 is required in order to be able to generate your site passwords. This means
 that as long as your secret file is safe, all the compute power on **earth**
 would require literally a billion years to crack your site passwords.
 
-If a hacker somehow gets your secret file though, then you are screwed.
-Probably a good idea to have a new master password.
+If a hacker somehow gets them both, then you are screwed.  Probably a good idea
+to generate a new one of both just in case.
 
 So, you have to change your master password but there is no rush. How do you
 do it?
@@ -200,7 +200,7 @@ to a newly generated password gotten with `novault get <site>`.
 This will require you to type in your new master password a lot. Think of this
 as a good chance to make sure you really remember it, as well as penance for
 accidentally typing your master password into facebook... or work chat... or
-(*gasp*) in an email to your ex-lover who happens to be a hacker.
+(_gasp_) in an email to your ex-lover who happens to be a hacker.
 
 When you are done, you can delete `backup.txt` and `novault.secret.bk` or keep
 them, it doesn't really matter. I recommend keeping them in case you
