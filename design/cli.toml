@@ -29,7 +29,7 @@ security kernel in more complex GUI applications.
 [SPC-cli]
 text = '''
 The command line interface shall have the following flags
-for controling configuration:
+for controlling configuration:
 - `-s --sites`: location of the "sites" file
 - `-l --lock`: location of the "lock" file preventing multiple instance from
   running.
@@ -46,14 +46,14 @@ The following sub commands shall exist to fulfill [[REQ-cli]]:
   setting user defined security level.
 - `novault set`: add/modify a site to the public `novault.sites` file. It has
   the following flags:
-  - `name`: the name of the site, must be unique (or `--overwrite` passsed).
+  - `name`: the name of the site, must be unique (or `--overwrite` passed).
   - `--overwrite`: stores even if `name` already exists. Useful for updating
     `--rev`.
   - `--rev`: revision number of password, needed for sites that require you
     to update your password as a "security-measure". `--rev` is not changed
     on `--overwrite` if it is not specified.
   - `--fmt`: fmt fulfils in a single command what other password managers
-    require a large number of ofen complicated flags to fulfill. It uses full
+    require a large number of often complicated flags to fulfill. It uses full
     rust/python formatting syntax to modify the password in any way the user
     sees fit including restricting length and injecting characters.
   - `--pin`: converts output to stringified u64 instead of base64url
@@ -62,12 +62,12 @@ The following sub commands shall exist to fulfill [[REQ-cli]]:
 - `novault get`: get a site's password, writing it via keyboard when
   any data has been written to `novault.lock`
 
-In addition, the following subcommands are provided for convinience:
+In addition, the following subcommands are provided for convenience:
 - `novault help`: get help on using NoVault
 - `novault list`: list available sites.
 - `novault InSeCuRe`: insecure subcommands. The name is intentionally made
-  difficult and weird to type to prvent accidentally calling it.
+  difficult and weird to type to prevent accidentally calling it.
     - `--export`: export current passwords to stdout. This is very
-      important when the master password has been compromized so the
+      important when the master password has been compromised so the
       user has a reference while they are changing passwords.
 '''
