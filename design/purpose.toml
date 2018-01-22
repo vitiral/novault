@@ -6,7 +6,7 @@ NoVault is a command line password manager that intends to be:
 - [[REQ-security]]: As secure as possible: use the most cutting edge
   cryptography and have highly secure defaults.
 - [[SPC-embedded]]: Designed to be embeddable: additional complexity can be
-  obtained by embedding NoVault in a larger applicaion.
+  obtained by embedding NoVault in a larger application.
 '''
 
 [REQ-security]
@@ -35,8 +35,8 @@ passwords in a "vault" (we will call them "vaulted password managers") are
 destructive for user security because they make them scared of loosing their
 vault. If the vault is gone, so are the passwords.
 
-To avoid this catastrophy, users store their vault on site-sharing places like
-google drive or even github, exposing their passwords to offline attacks.
+To avoid this catastrophe, users store their vault on site-sharing places like
+google drive or even GitHub, exposing their passwords to offline attacks.
 
 By contrast, if all you need is to remember a single master password and back
 up a single secret file*one time* (it never has to be changed or updated) means
