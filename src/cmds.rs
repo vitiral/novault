@@ -1,3 +1,11 @@
+/* Copyright (c) 2018 Garrett Berg, vitiral@gmail.com
+ *
+ * Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
+ * http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
+ * http://opensource.org/licenses/MIT>, at your option. This file may not be
+ * copied, modified, or distributed except according to those terms.
+ */
+//! Functions which implement the command line commands.
 use ansi_term::Colour::{Green, Red};
 use enigo::{self, KeyboardControllable};
 
