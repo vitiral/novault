@@ -222,7 +222,7 @@ pretty cautious about accepting large changes or new features as I don't want
 to compromise the security of the application.
 
 [art]: https://github.com/vitiral/artifact
-[design]: https://vitiral.github.io/novault/
+[design]: https://vitiral.github.io/novault/#artifacts/req-purpose
 
 
 # LICENSE
