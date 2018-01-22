@@ -217,6 +217,10 @@ them to your hacker ex-lover though...
 The deisgn documents are primarily hosted in `design/`. You can view them using
 [artifact][art] using `art serve`. They are also [rendered here][design].
 
+I welcome contributors, especially for security review. However, I will be
+pretty cautious about accepting large changes or new features as I don't want
+to compromise the security of the application.
+
 [art]: https://github.com/vitiral/artifact
 [design]: https://vitiral.github.io/novault/
 

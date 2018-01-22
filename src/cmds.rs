@@ -84,9 +84,7 @@ pub fn set(
         .write(true)
         .truncate(true)
         .open(&global.sites)
-        .chain_err(|| {
-            format!("Could not open {} for writing", global.sites.display())
-        })?;
+        .chain_err(|| format!("Could not open {} for writing", global.sites.display()))?;
 
     let out = dump(&sites, &mut f);
     if out.is_ok() {
@@ -200,13 +198,11 @@ where
     ::toml::from_str(&out).chain_err(|| format!("File format is invalid: {}", path.display()))
 }
 
-
 /// Serialize the
 pub fn dump<T: Serialize>(value: &T, file: &mut File) -> Result<()> {
     file.write_all(::toml::to_string(value).unwrap().as_ref())?;
     Ok(())
 }
-
 
 /// Ensure the file exists
 fn touch(path: &Path) -> Result<()> {

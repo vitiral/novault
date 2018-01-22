@@ -113,7 +113,7 @@ is a fairly safe value for modern computers.
     Set {
         #[structopt(name = "name",
                     help = "\
-Name for the site. Recommended: username@site-url.com")]
+                            Name for the site. Recommended: username@site-url.com")]
         name: String,
 
         #[structopt(short = "o", long = "overwrite",

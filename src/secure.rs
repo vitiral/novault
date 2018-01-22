@@ -47,7 +47,6 @@ impl MasterPass {
     }
 }
 
-
 /// Hash the password
 fn hash(settings: &Settings, master: &MasterPass, site: &Site) -> Result<String> {
     master.validate()?;

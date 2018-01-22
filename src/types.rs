@@ -28,7 +28,6 @@ pub static SITE_HEADER: &str = "NAME\tFMT\tSALT\tNOTES\n----\t---\t----\t-----";
 pub const INSECURE_MSG: &str = "!!! NOTICE: You are about to perform an insecure operation, be sur\
                                 e you know what you are doing before typing in your password !!!";
 
-
 error_chain!{
     types {
         Error, ErrorKind, ResultExt, Result;
@@ -87,7 +86,6 @@ error_chain!{
         }
     }
 }
-
 
 /// "Site Password" type. This exists to avoid confusing it with another string and
 /// to avoid accidentally serializing it.
