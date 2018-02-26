@@ -24,5 +24,8 @@ run-kill CMD="":
 		--stdin --sites {{sites}} --lock {{lock}} --secret {{secret}} \
 		{{CMD}}
 
+nix-build:
+	sudo nix-build -A novault_0_4_0
+
 test:
 	cargo test --release
