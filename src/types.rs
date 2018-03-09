@@ -12,7 +12,8 @@
 
 pub use std::process::exit;
 
-pub use prelude::*;
+pub use ergo::*;
+use secure;
 
 pub const ENCRYPT_LEN: usize = 128;
 pub const CHECK_HASH_LEN: usize = 16;
@@ -84,6 +85,11 @@ error_chain!{
             description("user specified an invalid combination of options")
             display("{}", msg)
         }
+
+        InvalidSessionPwd(remaining: u64) {
+            description("Incorrect session password")
+            display("Incorrect session password, {} attempts remaining", remaining)
+        }
     }
 }
 
@@ -135,6 +141,9 @@ pub struct OptGlobal {
     pub lock_file: File,
     pub stdin: bool,
     pub stdout: bool,
+    pub master: Option<secure::MasterPass>,
+    pub session: Option<String>, // session password
+    pub session_attempts: u64,   // session password attempts
 }
 
 pub type Sites = BTreeMap<String, Site>;
