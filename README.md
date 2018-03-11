@@ -67,7 +67,7 @@ cargo install novault
 Initialize your NoVault config file:
 
 ```
-novault init
+$ novault init
 ```
 
 This will ask for a master password, choose a good one. It is better to make a
@@ -84,7 +84,8 @@ freak out. See section "I lost my master password..." below.
 
 Once you have chosen your password, add a site:
 ```
-novault set vitiral@gmail.com --notes "open source email"
+$ novault loop
+>> set vitiral@gmail.com --notes "open source email"
 ```
 
 After you have added your first site, a file will be created at
@@ -96,8 +97,8 @@ For another example, setting the password and 4 digit pin of a bank might be
 done with:
 
 ```
-novault set vitiral@bank
-novault set pin.vitiral@bank --pin --fmt '{p:.4}'
+>> set vitiral@bank
+>> set pin.vitiral@bank --pin --fmt '{p:.4}'
 ```
 
 > The `{...}` syntax is the same as [rust/pthon's string fmt syntax][3].
@@ -112,12 +113,10 @@ Now you can get the site's password. NoVault will automatically validate that
 your password is the same one you used in `novault init`.
 
 ```
-novault get vitiral@gmail.com
-# ... Type in your password
+$ novault loop
+>> get vitiral@gmail.com
 # ... Run `echo "ok" >> ~/.confg/novault.lock` through a key binding.
 # ... NoVault will control your keyboard to type in your password securely
-
-novault --stdout get pin.vitiral@bank  # just print to stdout
 ```
 
 The sites you have added are stored in `~/.config/novault.sites` by default.
@@ -151,12 +150,13 @@ you are always your own worst enemy.
 ## I exposed my master password or secret file, what do I do?
 You need to change it, but you can probably finish your cup of coffee first.
 
-The truth is, as long as attackers don't hve BOTH your master password and your `novault.secret` file
-then there is literally no way on earth they will be able to do anything. The
-secret file contains a 256 character randomly generated ASCII string, which
-is required in order to be able to generate your site passwords. This means
-that as long as your secret file is safe, all the compute power on **earth**
-would require literally a billion years to crack your site passwords.
+The truth is, as long as attackers don't have BOTH your master password and
+your `novault.secret` file then there is literally no way on earth they will be
+able to do anything. The secret file contains a 256 character randomly
+generated ASCII string, which is required in order to be able to generate your
+site passwords. This means that as long as your secret file is safe, all the
+compute power on **earth** would require literally a billion years to crack
+your site passwords.
 
 If a hacker somehow gets them both, then you are screwed.  Probably a good idea
 to generate a new one of both just in case.
@@ -182,11 +182,6 @@ the same.
 ### Step 3: change the password for every site in your `~/.config/novault.sites`
 You should go to each site and change the password from what is in `backup.txt`
 to a newly generated password gotten with `novault get <site>`.
-
-This will require you to type in your new master password a lot. Think of this
-as a good chance to make sure you really remember it, as well as penance for
-accidentally typing your master password into facebook... or work chat... or
-(_gasp_) in an email to your ex-lover who happens to be a hacker.
 
 When you are done, you can delete `backup.txt` and `novault.secret.bk` or keep
 them, it doesn't really matter. I recommend keeping them in case you
