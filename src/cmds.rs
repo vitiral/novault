@@ -8,6 +8,11 @@
 //! Functions which implement the command line commands.
 use ansi_term::Colour::{Green, Red};
 use enigo::{self, KeyboardControllable};
+use dialoguer;
+use rustyline;
+use shlex;
+use super::LoopOpt;
+use structopt::StructOpt;
 
 use types::*;
 use secure;
@@ -27,18 +32,18 @@ fn validate_master(settings: &Settings, master: &secure::MasterPass) -> Result<(
 }
 
 /// Initialize the sites file
-pub fn init(global: &OptGlobal, level: u32, mem: u32, threads: u32) -> Result<()> {
+pub fn init(global: &mut OptGlobal, level: u32, mem: u32, threads: u32) -> Result<()> {
     if global.secret.exists() {
         bail!(ErrorKind::SecretFileExists(global.secret.to_path_buf()));
     }
     let secret = secure::generate_secret();
-    let master = secure::get_master(global.stdin)?;
+    let master = secure::get_master(global)?;
     let mut settings = Settings {
-        level: level,
-        mem: mem,
-        threads: threads,
+        level,
+        mem,
+        threads,
         checkhash: CheckHash(String::new()),
-        secret: secret,
+        secret,
     };
     settings.checkhash = secure::get_checkhash(&settings, &master);
     // create them both before dumping any
@@ -50,7 +55,7 @@ pub fn init(global: &OptGlobal, level: u32, mem: u32, threads: u32) -> Result<()
 
 /// set a site's metadata
 pub fn set(
-    global: &OptGlobal,
+    global: &mut OptGlobal,
     name: &str,
     overwrite: bool,
     pin: bool,
@@ -70,7 +75,7 @@ pub fn set(
 
     let site = Site {
         fmt: fmt.to_string(),
-        pin: pin,
+        pin,
         salt: format!("{}{}", name, rev),
         notes: notes.to_string(),
     };
@@ -117,14 +122,14 @@ pub fn list(global: &OptGlobal) -> Result<()> {
 }
 
 /// get a password and write it using keyboard after -SIGUSR1
-pub fn get(global: &OptGlobal, name: &str) -> Result<()> {
+pub fn get(global: &mut OptGlobal, name: &str) -> Result<()> {
     let settings: Settings = load(&global.secret)?;
     let sites: Sites = load(&global.sites)?;
     let site = match sites.get(name) {
         Some(s) => s,
         None => bail!(ErrorKind::NotFound(name.to_string())),
     };
-    let master = secure::get_master(global.stdin)?;
+    let master = secure::get_master(global)?;
     validate_master(&settings, &master)?;
 
     let password = secure::site_pass(&settings, &master, site)?;
@@ -161,7 +166,7 @@ pub fn get(global: &OptGlobal, name: &str) -> Result<()> {
 }
 
 /// Do insecure operations
-pub fn insecure(global: &OptGlobal, export: bool) -> Result<()> {
+pub fn insecure(global: &mut OptGlobal, export: bool) -> Result<()> {
     if !export {
         bail!(ErrorKind::InvalidCmd(
             "Only --export is currently supported".to_string()
@@ -171,7 +176,7 @@ pub fn insecure(global: &OptGlobal, export: bool) -> Result<()> {
     let sites: Sites = load(&global.sites)?;
 
     eprintln!("{}", Red.bold().paint(INSECURE_MSG));
-    let master = secure::get_master(global.stdin)?;
+    let master = secure::get_master(global)?;
     validate_master(&settings, &master)?;
 
     let mut passwords: BTreeMap<String, String> = BTreeMap::new();
@@ -182,6 +187,63 @@ pub fn insecure(global: &OptGlobal, export: bool) -> Result<()> {
 
     print!("{}", ::toml::to_string(&passwords).expect("toml failed"));
     Ok(())
+}
+
+pub fn loop_(global: &mut OptGlobal) -> Result<()> {
+    eprintln!("Starting NoVault loop.");
+    // cache the master password
+    let settings: Settings = load(&global.secret)
+        .chain_err(|| "Not initialized. Use `novault init` to initialize passwords.")?;
+
+    {
+        let master = secure::get_master(global)?; // note: stores in cache
+        validate_master(&settings, &master)?;
+    }
+
+    let prompt = "Enter the session password. This can be less secure than the master password:";
+    global.session = match dialoguer::PasswordInput::new(prompt).interact() {
+        Ok(s) => Some(s),
+        Err(_) => {
+            eprintln!("OS Error: getting password failed");
+            exit(1);
+        }
+    };
+
+    let mut rl = rustyline::Editor::<()>::new();
+    loop {
+        eprintln!("\nType \"help\" for help and \"exit\" to exit.");
+        let readline = match rl.readline(">> ") {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("Got {}", e);
+                exit(0);
+            }
+        };
+        let line = readline.trim();
+        if line.to_ascii_uppercase() == "EXIT" {
+            exit(0);
+        }
+        let mut args = match shlex::split(&readline) {
+            Some(a) => a,
+            None => {
+                eprintln!("Invalid shell syntax");
+                continue;
+            }
+        };
+        args.insert(0, "novault".into());
+
+        let matches = match super::LoopOpt::clap().get_matches_from_safe(args) {
+            Ok(m) => m,
+            Err(err) => {
+                eprintln!("{}", err);
+                continue;
+            }
+        };
+
+        if let Err(err) = super::run_cmd_single(global, &LoopOpt::from_clap(matches).cmd) {
+            eprintln!("{}", err);
+        }
+    }
 }
 
 // HELPERS

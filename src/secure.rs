@@ -16,19 +16,21 @@ use dialoguer;
 
 // Traits
 use byteorder::ByteOrder;
-use rand::Rng;
+use ergo::rand::Rng;
 
 use types::*;
+use std::io;
 
 /// "Master Password" type. Only this module can access the internals
+#[derive(Clone)]
 pub struct MasterPass {
-    audit_this: String,
+    audit_this: Rc<String>,
 }
 
 impl MasterPass {
     fn new(s: &str) -> MasterPass {
         MasterPass {
-            audit_this: s.to_string(),
+            audit_this: Rc::new(s.to_string()),
         }
     }
 
@@ -58,11 +60,11 @@ fn hash(settings: &Settings, master: &MasterPass, site: &Site) -> Result<String>
     )?;
     let mut hashed = vec![0u8; ENCRYPT_LEN];
     ar.hash(
-        &mut hashed,                  // output
-        settings.secret.0.as_ref(),   // p: plaintext secret file
-        site.salt.repeat(8).as_ref(), // s: salt, 16 bytes is recommended
-        master.audit_this.as_ref(),   // k: secret key (master password)
-        &[],                          // x: associated data, not useful for this app
+        &mut hashed,                         // output
+        settings.secret.0.as_ref(),          // p: plaintext secret file
+        site.salt.repeat(8).as_ref(),        // s: salt, 16 bytes is recommended
+        master.audit_this.as_ref().as_ref(), // k: secret key (master password)
+        &[],                                 // x: associated data, not useful for this app
     );
 
     let out = if site.pin {
@@ -94,12 +96,36 @@ fn test_fmt() {
     assert!(fmt("long-prefix-{p:.2}", "barabado").is_err()); // pwd too short
 }
 
-pub fn get_master(stdin: bool) -> Result<MasterPass> {
+/// Get the master password based on the ``OptGlobal`` configuration/cache.
+pub fn get_master(global: &mut OptGlobal) -> Result<MasterPass> {
+    if let Some(ref master) = global.master {
+        debug_assert!(global.session.is_some());
+        let prompt = "Enter the session password:";
+        let session = dialoguer::PasswordInput::new(prompt)
+            .interact()
+            .chain_err(|| "OS Error: getting password failed")?;
+        if Some(session) != global.session {
+            eprintln!("Incorrect session password.");
+            global.session_attempts += 1;
+            if global.session_attempts >= 3 {
+                eprintln!(
+                    "{} failed attempts at session password, exiting",
+                    global.session_attempts
+                );
+                exit(1)
+            }
+            return Err(ErrorKind::InvalidSessionPwd(3 - global.session_attempts).into());
+        } else {
+            global.session_attempts = 0;
+            return Ok(master.clone());
+        }
+    }
     let prompt = "Enter your master password";
-    let pass = if stdin {
+    let pass = if global.stdin {
         eprint!("Waiting for password through stdin...");
+        io::stdout().flush()?;
         let mut pass = String::with_capacity(128);
-        ::std::io::stdin().read_line(&mut pass)?;
+        io::stdin().read_line(&mut pass)?;
         eprintln!(" got password!");
         pass
     } else {
@@ -109,6 +135,7 @@ pub fn get_master(stdin: bool) -> Result<MasterPass> {
     };
     let pass = MasterPass::new(&pass);
     pass.validate()?;
+    global.master = Some(pass.clone());
     Ok(pass)
 }
 

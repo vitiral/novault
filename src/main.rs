@@ -9,6 +9,9 @@
 
 #![recursion_limit = "128"]
 
+extern crate ergo;
+pub use ergo::*;
+
 extern crate ansi_term;
 extern crate argon2rs;
 extern crate base64;
@@ -18,18 +21,13 @@ extern crate enigo;
 #[macro_use]
 extern crate error_chain;
 extern crate file_lock;
-extern crate prelude;
-extern crate rand;
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
-extern crate shellexpand;
+extern crate shlex;
 extern crate strfmt;
 extern crate structopt;
 #[macro_use]
 extern crate structopt_derive;
+extern crate rustyline;
 extern crate tabwriter;
-extern crate toml;
 
 use structopt::StructOpt;
 use file_lock::{AccessMode, Lock, LockKind};
@@ -67,11 +65,24 @@ struct Opt {
     /// !! NOT SECURE !! print password directly to stdout.
     stdout: bool,
 
-    #[structopt(subcommand)] cmd: Command,
+    #[structopt(subcommand)]
+    cmd: Command,
+}
+
+#[derive(Debug, StructOpt)]
+#[structopt(name = "novault-loop")]
+/// Parsed option when in a loop
+struct LoopOpt {
+    #[structopt(subcommand)]
+    cmd: Command,
 }
 
 #[derive(Debug, StructOpt)]
 enum Command {
+    #[structopt(name = "loop")]
+    /// Do a continuous loop.
+    Loop {},
+
     #[structopt(name = "init")]
     /// Initialize the secret file
     Init {
@@ -189,8 +200,34 @@ This should almost never be done. The only exceptions are:
     },
 }
 
+fn run_cmd_single(global: &mut OptGlobal, cmd: &Command) -> Result<()> {
+    match *cmd {
+        Command::Init {
+            level,
+            mem,
+            threads,
+        } => cmds::init(global, level, mem, threads),
+        Command::Set {
+            ref name,
+            overwrite,
+            pin,
+            rev,
+            ref fmt,
+            ref notes,
+        } => cmds::set(global, name, overwrite, pin, rev, fmt, notes),
+        Command::List {} => cmds::list(global),
+        Command::Get { ref name } => cmds::get(global, name),
+        Command::Insecure { export } => cmds::insecure(global, export),
+        Command::Loop {} => {
+            eprintln!("You are already in a loop!");
+            Ok(())
+        }
+    }
+}
+
 fn main() {
     let opt = Opt::from_args();
+
     let sites = PathBuf::from(shellexpand::tilde(&opt.sites).to_string());
     let secret = PathBuf::from(shellexpand::tilde(&opt.secret).to_string());
     let lock_path = PathBuf::from(shellexpand::tilde(&opt.lock).to_string());
@@ -224,32 +261,22 @@ fn main() {
     }
     lock_file.set_len(0).expect("Could not truncate lock file.");
 
-    let global = OptGlobal {
-        sites: sites,
-        secret: secret,
-        lock_path: lock_path,
-        lock_file: lock_file,
+    let mut global = OptGlobal {
+        sites,
+        secret,
+        lock_path,
+        lock_file,
         stdin: opt.stdin,
         stdout: opt.stdout,
+        master: None,
+        session: None,
+        session_attempts: 0,
     };
 
-    let result = match opt.cmd {
-        Command::Init {
-            level,
-            mem,
-            threads,
-        } => cmds::init(&global, level, mem, threads),
-        Command::Set {
-            name,
-            overwrite,
-            pin,
-            rev,
-            fmt,
-            notes,
-        } => cmds::set(&global, &name, overwrite, pin, rev, &fmt, &notes),
-        Command::List {} => cmds::list(&global),
-        Command::Get { name } => cmds::get(&global, &name),
-        Command::Insecure { export } => cmds::insecure(&global, export),
+    let result = if let Command::Loop {} = opt.cmd {
+        cmds::loop_(&mut global)
+    } else {
+        run_cmd_single(&mut global, &opt.cmd)
     };
 
     match result {
@@ -258,8 +285,6 @@ fn main() {
             exit_with_err(&e.to_string());
         }
     }
-
-    drop(lock);
 }
 
 fn exit_with_err(msg: &str) {
