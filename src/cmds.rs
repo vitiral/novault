@@ -153,6 +153,8 @@ pub fn get(global: &mut OptGlobal, name: &str) -> Result<()> {
         sleep(Duration::from_millis(100));
     }
 
+    global.lock_file.set_len(0);
+
     eprintln!("Typing password via keyboard in exactly 1 second...");
     sleep(Duration::from_millis(1000));
 
