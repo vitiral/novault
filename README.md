@@ -1,3 +1,6 @@
+**NOTICE WARNING: This application is no longer actively maintained or in use
+by the author. Use at your own risk.**
+
 # NoVault: ultra simple and secure password management
 
 > Note: as of version 0.4.0 it is not expected that there will be breaking
